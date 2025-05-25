@@ -8,7 +8,8 @@ import { TokenType } from '../types/index.js';
 export function isJwtToken(token: string): boolean {
     // JWT tokens have three parts separated by dots
     const parts = token.split('.');
-    return parts.length === 3;
+    // Must have exactly 3 parts, and the token cannot be just dots
+    return parts.length === 3 && token.length > 2;
 }
 
 /**

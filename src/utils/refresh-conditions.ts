@@ -10,7 +10,7 @@ export const defaultUserInfoRefreshCondition: UserInfoRefreshCondition = (
 ): boolean => {
     if (user.lastUserInfoRefresh) {
         const oneHourAgo = Date.now() - 60 * 60 * 1000; // 1 hour in milliseconds
-        return user.lastUserInfoRefresh < oneHourAgo;
+        return user.lastUserInfoRefresh <= oneHourAgo;
     }
 
     return true; // Never refreshed before
