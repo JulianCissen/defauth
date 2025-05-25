@@ -8,3 +8,4 @@ applyTo: '**/*.{ts}'
 - Don't add unnecessary type annotations. TypeScript can infer types in many cases, and adding redundant annotations can clutter the code.
 - Add JSDoc comments for public functions and classes. Use the `@param` tag for parameters and `@returns` for return values. Make sure to add JSDoc also for all function styles (declaration, expression and arrow).
 - Focus on readability and maintainability. Write code that is easy to understand and follow, even if it means being more verbose.
+- Code deduplication is important, as long as it improves readability and maintainability. If you see duplicated code, consider refactoring it into a shared function or utility.
