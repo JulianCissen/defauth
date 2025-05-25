@@ -1,0 +1,75 @@
+import { Authenticator, InMemoryStorageAdapter } from '../src/index.js';
+
+// Example usage of the DefAuth library
+
+/**
+ * Example demonstrating DefAuth's hybrid approach with UserInfo and token introspection
+ */
+async function example() {
+    // Example 1: Initialize the authenticator with a client secret (confidential client)
+    const authWithSecret = new Authenticator({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret', // Provided for confidential clients
+
+        // Optional: Use custom storage adapter
+        storageAdapter: new InMemoryStorageAdapter(),
+
+        // Optional: Custom refresh condition for UserInfo
+        userInfoRefreshCondition: (user) => {
+            // Refresh UserInfo every 30 minutes instead of default 1 hour
+            if (!user.lastUserInfoRefresh) return true;
+
+            const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
+            return user.lastUserInfoRefresh < thirtyMinutesAgo;
+        },
+    });
+    
+    // Example 2: Initialize the authenticator without a client secret (public client)
+    const publicClientAuth = new Authenticator({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-public-client-id',
+        // No clientSecret needed for public clients (SPAs, mobile apps, etc.)
+        
+        // Using default storage adapter and refresh conditions
+    });
+
+    // Example JWT token (this would come from your request headers)
+    const jwtToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+    // Example opaque token
+    const opaqueToken = 'abc123def456ghi789';
+
+    try {
+        // Standard JWT token validation (signature verification + UserInfo)
+        const userFromJwt = await authWithSecret.getUser(jwtToken);
+        console.log('User from JWT (standard validation):', {
+            sub: userFromJwt.sub,
+            email: userFromJwt.email,
+            name: userFromJwt.name,
+        });
+
+        // JWT token with forced introspection (for high-security scenarios)
+        const userFromJwtWithIntrospection = await authWithSecret.getUser(jwtToken, { 
+            forceIntrospection: true 
+        });
+        console.log('User from JWT with forced introspection:', {
+            sub: userFromJwtWithIntrospection.sub,
+            email: userFromJwtWithIntrospection.email,
+            name: userFromJwtWithIntrospection.name,
+        });
+
+        // Get user from opaque token (always introspected + UserInfo when available)
+        const userFromOpaque = await publicClientAuth.getUser(opaqueToken);
+        console.log('User from opaque token:', {
+            sub: userFromOpaque.sub,
+            email: userFromOpaque.email,
+            name: userFromOpaque.name,
+        });
+    } catch (error) {
+        console.error('Authentication failed:', error.message);
+    }
+}
+
+// Uncomment to run the example
+// example().catch(console.error);
