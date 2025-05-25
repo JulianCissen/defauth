@@ -8,6 +8,8 @@ export type {
     AuthenticatorConfig,
     StorageAdapter,
     UserInfoRefreshCondition,
+    Logger,
+    LogLevel,
 } from './types/index.js';
 
 // Storage adapter exports
@@ -18,6 +20,7 @@ export {
     isJwtToken,
     getTokenType,
     defaultUserInfoRefreshCondition,
+    ConsoleLogger,
 } from './utils/index.js';
 
 export {

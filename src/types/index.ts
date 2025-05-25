@@ -1,6 +1,28 @@
 import { z } from 'zod';
 
 /**
+ * Log levels for the logger interface
+ */
+export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+
+/**
+ * Logger interface for custom logging implementations
+ */
+export interface Logger {
+    /**
+     * Log a message with the specified level
+     * @param level - The log level
+     * @param message - The log message
+     * @param context - Optional context object with additional information
+     */
+    log(
+        level: LogLevel,
+        message: string,
+        context?: Record<string, unknown>,
+    ): void;
+}
+
+/**
  * Zod schema for user claims validation
  * Only requires the 'sub' claim, all other claims are optional
  */
@@ -80,6 +102,15 @@ export interface AuthenticatorConfig {
      * This determines when the UserInfo endpoint should be called
      */
     userInfoRefreshCondition?: UserInfoRefreshCondition;
+    /**
+     * Logger implementation for custom logging (defaults to console-based logger)
+     */
+    logger?: Logger;
+    /**
+     * Whether to throw errors when UserInfo endpoint fails (defaults to false)
+     * When false, UserInfo failures are logged and the method continues with available data
+     */
+    throwOnUserInfoFailure?: boolean;
 }
 
 /**

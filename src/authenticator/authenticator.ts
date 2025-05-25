@@ -2,6 +2,7 @@ import * as jose from 'jose';
 import * as openid from 'openid-client';
 import type {
     AuthenticatorConfig,
+    Logger,
     StorageAdapter,
     UserClaims,
     UserInfoRefreshCondition,
@@ -9,6 +10,7 @@ import type {
 } from '../types/index.js';
 import { TokenType, UserClaimsSchema } from '../types/index.js';
 import {
+    ConsoleLogger,
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
@@ -22,6 +24,8 @@ export class Authenticator {
     private clientConfig?: openid.Configuration;
     private storageAdapter: StorageAdapter;
     private userInfoRefreshCondition: UserInfoRefreshCondition;
+    private logger: Logger;
+    private throwOnUserInfoFailure: boolean;
     private isInitialized = false;
 
     /**
@@ -33,6 +37,8 @@ export class Authenticator {
             config.storageAdapter || new InMemoryStorageAdapter();
         this.userInfoRefreshCondition =
             config.userInfoRefreshCondition || defaultUserInfoRefreshCondition;
+        this.logger = config.logger || new ConsoleLogger();
+        this.throwOnUserInfoFailure = config.throwOnUserInfoFailure || false;
 
         this.initializeClient(config).catch((error) => {
             throw new Error(
@@ -141,9 +147,10 @@ export class Authenticator {
                 });
                 return finalClaims;
             } catch (error) {
-                console.warn(
-                    `Failed to fetch UserInfo: ${(error as Error).message}`,
-                );
+                this.handleUserInfoFailure(error as Error, {
+                    tokenType: 'opaque',
+                    subject: userClaims.sub,
+                });
                 await this.storeUserWithTimestamps(userClaims, {
                     lastIntrospection: Date.now(),
                 });
@@ -192,9 +199,11 @@ export class Authenticator {
                     });
                     return finalClaims;
                 } catch (error) {
-                    console.warn(
-                        `Failed to fetch UserInfo: ${(error as Error).message}`,
-                    );
+                    this.handleUserInfoFailure(error as Error, {
+                        tokenType: 'jwt',
+                        subject: userClaims.sub,
+                        forceIntrospection,
+                    });
                     const finalClaims = userRecord 
                         ? this.combineClaimsWithPriority(userRecord, userClaims)
                         : userClaims;
@@ -323,6 +332,25 @@ export class Authenticator {
         if (!result.active) {
             throw new Error('Token is not active');
         }
+    }
+
+    /**
+     * Handle UserInfo fetch failure based on configuration
+     * @param error - The error that occurred
+     * @param context - Additional context for logging
+     * @throws Error if throwOnUserInfoFailure is true
+     */
+    private handleUserInfoFailure(
+        error: Error,
+        context?: Record<string, unknown>,
+    ): void {
+        const message = `Failed to fetch UserInfo: ${error.message}`;
+        
+        if (this.throwOnUserInfoFailure) {
+            throw new Error(message);
+        }
+        
+        this.logger.log('warn', message, context);
     }
 
     /**

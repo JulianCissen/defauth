@@ -70,8 +70,19 @@ const auth = new Authenticator({
 import { 
   Authenticator, 
   InMemoryStorageAdapter,
+  ConsoleLogger,
   defaultUserInfoRefreshCondition 
 } from 'defauth';
+import type { Logger, LogLevel } from 'defauth';
+
+// Custom logger implementation
+class CustomLogger implements Logger {
+  log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
+    const timestamp = new Date().toISOString();
+    const contextStr = context ? ` [Context: ${JSON.stringify(context)}]` : '';
+    console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`);
+  }
+}
 
 const auth = new Authenticator({
   issuer: 'https://your-oidc-provider.com',
@@ -80,6 +91,12 @@ const auth = new Authenticator({
   
   // Optional: Custom storage adapter
   storageAdapter: new InMemoryStorageAdapter(),
+  
+  // Optional: Custom logger (defaults to ConsoleLogger)
+  logger: new CustomLogger(),
+  
+  // Optional: Throw on UserInfo failure instead of logging warnings (defaults to false)
+  throwOnUserInfoFailure: true,
   
   // Optional: Custom refresh condition
   userInfoRefreshCondition: (user) => {
@@ -107,6 +124,57 @@ The library automatically detects token types and handles them with a hybrid app
 - Enhances with UserInfo endpoint data when available
 - Caches results in storage adapter
 - Updates both introspection and UserInfo refresh timestamps
+
+## Custom Logging
+
+The library supports custom logging implementations for better integration with your application's logging system:
+
+```typescript
+import { Authenticator, Logger, LogLevel } from 'defauth';
+
+// Custom logger that integrates with your logging framework
+class MyAppLogger implements Logger {
+  log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
+    // Integration with your preferred logging library (Winston, Pino, etc.)
+    myAppLoggingFramework.log({
+      level,
+      message,
+      context,
+      timestamp: new Date().toISOString(),
+      service: 'defauth'
+    });
+  }
+}
+
+const auth = new Authenticator({
+  // ... other config
+  logger: new MyAppLogger(),
+  
+  // Control error handling behavior
+  throwOnUserInfoFailure: false // Log warnings instead of throwing errors
+});
+```
+
+### Error Handling Options
+
+You can configure how the library handles UserInfo endpoint failures:
+
+- **`throwOnUserInfoFailure: false`** (default): Logs warnings and continues with available data
+- **`throwOnUserInfoFailure: true`**: Throws errors when UserInfo endpoint fails
+
+```typescript
+// Strict mode - throws on any UserInfo failure
+const strictAuth = new Authenticator({
+  // ... config
+  throwOnUserInfoFailure: true
+});
+
+// Resilient mode - logs warnings and continues (default)
+const resilientAuth = new Authenticator({
+  // ... config
+  throwOnUserInfoFailure: false
+});
+```
 
 ## Custom Storage Adapters
 
@@ -194,6 +262,12 @@ Interface for implementing custom storage solutions.
 
 #### `UserInfoRefreshCondition`
 Function type for determining when to refresh user information from UserInfo endpoint.
+
+#### `Logger`
+Interface for implementing custom logging solutions.
+
+#### `LogLevel`
+Type for log levels: 'error' | 'warn' | 'info' | 'debug'.
 
 #### `IntrospectionCondition`
 Deprecated alias for `UserInfoRefreshCondition`.

@@ -1,12 +1,52 @@
-import { Authenticator, InMemoryStorageAdapter } from '../src/index.js';
+import { Authenticator, InMemoryStorageAdapter, ConsoleLogger } from '../src/index.js';
+import type { Logger, LogLevel } from '../src/index.js';
 
 // Example usage of the DefAuth library
+
+/**
+ * Custom logger implementation example
+ */
+class CustomLogger implements Logger {
+    log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
+        const timestamp = new Date().toISOString();
+        const contextStr = context ? ` [Context: ${JSON.stringify(context)}]` : '';
+        console.log(`[${timestamp}] [${level.toUpperCase()}] ${message}${contextStr}`);
+    }
+}
 
 /**
  * Example demonstrating DefAuth's hybrid approach with UserInfo and token introspection
  */
 async function example() {
-    // Example 1: Initialize the authenticator with a client secret (confidential client)
+    // Example 1: Initialize with custom logger and throw on UserInfo failure
+    const authWithCustomLogger = new Authenticator({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret',
+        
+        // Custom logger implementation
+        logger: new CustomLogger(),
+        
+        // Throw errors when UserInfo endpoint fails instead of logging warnings
+        throwOnUserInfoFailure: true,
+        
+        storageAdapter: new InMemoryStorageAdapter(),
+    });
+
+    // Example 2: Initialize with default console logger but don't throw on UserInfo failure
+    const authWithConsoleLogger = new Authenticator({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret',
+        
+        // Explicitly use the default console logger
+        logger: new ConsoleLogger(),
+        
+        // Log warnings but don't throw (default behavior)
+        throwOnUserInfoFailure: false,
+    });
+
+    // Example 3: Initialize the authenticator with a client secret (confidential client)
     const authWithSecret = new Authenticator({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
@@ -25,7 +65,7 @@ async function example() {
         },
     });
     
-    // Example 2: Initialize the authenticator without a client secret (public client)
+    // Example 4: Initialize the authenticator without a client secret (public client)
     const publicClientAuth = new Authenticator({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-public-client-id',
