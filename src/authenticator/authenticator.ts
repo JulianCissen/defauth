@@ -134,41 +134,11 @@ export class Authenticator {
 
         const userRecord = await this.storageAdapter.findUser(userClaims.sub);
 
-        if (this.shouldRefreshUserInfo(userRecord)) {
-            try {
-                const userInfoClaims = await this.fetchUserInfo(
-                    token,
-                    userClaims.sub,
-                );
-                const finalClaims = this.combineClaimsWithPriority(
-                    userClaims,
-                    userInfoClaims,
-                );
-                await this.storeUserWithTimestamps(finalClaims, {
-                    lastUserInfoRefresh: Date.now(),
-                    lastIntrospection: Date.now(),
-                });
-                return finalClaims;
-            } catch (error) {
-                this.handleUserInfoFailure(error as Error, {
-                    tokenType: 'opaque',
-                    subject: userClaims.sub,
-                });
-                await this.storeUserWithTimestamps(userClaims, {
-                    lastIntrospection: Date.now(),
-                });
-                return userClaims;
-            }
-        }
-
-        const finalClaims = userRecord
-            ? this.combineClaimsWithPriority(userRecord, userClaims)
-            : userClaims;
-
-        await this.storeUserWithTimestamps(finalClaims, {
+        return this.processUserClaims(token, userClaims, {
+            tokenType: 'opaque',
+            userRecord,
             lastIntrospection: Date.now(),
         });
-        return finalClaims;
     }
 
     /**
@@ -189,53 +159,12 @@ export class Authenticator {
             const userClaims = this.createUserClaimsFromPayload(payload);
             const userRecord = await this.storageAdapter.findUser(payload.sub);
 
-            if (this.shouldRefreshUserInfo(userRecord)) {
-                try {
-                    const userInfoClaims = await this.fetchUserInfo(
-                        token,
-                        userClaims.sub,
-                    );
-                    const finalClaims = this.combineClaimsWithPriority(
-                        userClaims,
-                        userInfoClaims,
-                    );
-                    await this.storeUserWithTimestamps(finalClaims, {
-                        lastUserInfoRefresh: Date.now(),
-                        lastIntrospection: forceIntrospection
-                            ? Date.now()
-                            : userRecord?.lastIntrospection,
-                    });
-                    return finalClaims;
-                } catch (error) {
-                    this.handleUserInfoFailure(error as Error, {
-                        tokenType: 'jwt',
-                        subject: userClaims.sub,
-                        forceIntrospection,
-                    });
-                    const finalClaims = userRecord
-                        ? this.combineClaimsWithPriority(userRecord, userClaims)
-                        : userClaims;
-                    await this.storeUserWithTimestamps(finalClaims, {
-                        lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
-                        lastIntrospection: forceIntrospection
-                            ? Date.now()
-                            : userRecord?.lastIntrospection,
-                    });
-                    return finalClaims;
-                }
-            }
-
-            const finalClaims = userRecord
-                ? this.combineClaimsWithPriority(userRecord, userClaims)
-                : userClaims;
-
-            await this.storeUserWithTimestamps(finalClaims, {
-                lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
-                lastIntrospection: forceIntrospection
-                    ? Date.now()
-                    : userRecord?.lastIntrospection,
+            return this.processUserClaims(token, userClaims, {
+                tokenType: 'jwt',
+                userRecord,
+                lastIntrospection: userRecord?.lastIntrospection,
+                forceIntrospection,
             });
-            return finalClaims;
         } catch (error) {
             throw new Error(
                 `Failed to process JWT token: ${(error as Error).message}`,
@@ -300,7 +229,6 @@ export class Authenticator {
      * @returns User claims object
      */
     private createUserClaimsFromPayload(payload: UserClaims): UserClaims {
-        const userClaims: UserClaims = { sub: payload.sub };
         const tokenMetadataClaims = [
             'client_id',
             'scope',
@@ -309,17 +237,7 @@ export class Authenticator {
             'jti',
         ];
 
-        for (const [key, value] of Object.entries(payload)) {
-            if (
-                key !== 'sub' &&
-                !tokenMetadataClaims.includes(key) &&
-                value !== undefined
-            ) {
-                userClaims[key] = value;
-            }
-        }
-
-        return userClaims;
+        return this.extractUserClaims(payload, tokenMetadataClaims);
     }
 
     /**
@@ -445,14 +363,6 @@ export class Authenticator {
     private introspectionResponseToUserClaims(
         response: IntrospectionResponse,
     ): UserClaims {
-        const sub = response.sub || '';
-        if (!sub) {
-            throw new Error(
-                'Introspection response missing required "sub" claim',
-            );
-        }
-
-        const userClaims: UserClaims = { sub };
         const tokenMetadataClaims = [
             'active',
             'client_id',
@@ -462,17 +372,7 @@ export class Authenticator {
             'jti',
         ];
 
-        for (const [key, value] of Object.entries(response)) {
-            if (
-                key !== 'sub' &&
-                !tokenMetadataClaims.includes(key) &&
-                value !== undefined
-            ) {
-                userClaims[key] = value;
-            }
-        }
-
-        return userClaims;
+        return this.extractUserClaims(response, tokenMetadataClaims);
     }
 
     /**
@@ -505,25 +405,123 @@ export class Authenticator {
                 expectedSubject,
             );
 
-            if (!userInfoResponse.sub) {
-                throw new Error(
-                    'UserInfo response missing required "sub" claim',
-                );
-            }
-
-            const userClaims: UserClaims = { sub: userInfoResponse.sub };
-
-            for (const [key, value] of Object.entries(userInfoResponse)) {
-                if (key !== 'sub' && value !== undefined) {
-                    userClaims[key] = value;
-                }
-            }
-
-            return userClaims;
+            return this.extractUserClaims(userInfoResponse);
         } catch (error) {
             throw new Error(
                 `Failed to fetch user info: ${(error as Error).message}`,
             );
         }
+    }
+
+    /**
+     * Process user claims and handle user info refresh
+     * @param token - The token (JWT or opaque)
+     * @param userClaims - Initial user claims
+     * @param options - Processing options
+     * @param options.tokenType - Type of token being processed
+     * @param options.userRecord - Existing user record if available
+     * @param options.lastIntrospection - Timestamp of last introspection
+     * @param options.forceIntrospection - Whether introspection was forced
+     * @returns Promise resolving to processed user claims
+     */
+    private async processUserClaims(
+        token: string,
+        userClaims: UserClaims,
+        options: {
+            tokenType: 'jwt' | 'opaque';
+            userRecord: UserRecord | null;
+            lastIntrospection?: number;
+            forceIntrospection?: boolean;
+        },
+    ): Promise<UserClaims> {
+        const { tokenType, userRecord, lastIntrospection, forceIntrospection } =
+            options;
+
+        if (this.shouldRefreshUserInfo(userRecord)) {
+            try {
+                const userInfoClaims = await this.fetchUserInfo(
+                    token,
+                    userClaims.sub,
+                );
+                const finalClaims = this.combineClaimsWithPriority(
+                    userClaims,
+                    userInfoClaims,
+                );
+
+                await this.storeUserWithTimestamps(finalClaims, {
+                    lastUserInfoRefresh: Date.now(),
+                    lastIntrospection:
+                        tokenType === 'opaque' || forceIntrospection
+                            ? Date.now()
+                            : lastIntrospection,
+                });
+
+                return finalClaims;
+            } catch (error) {
+                this.handleUserInfoFailure(error as Error, {
+                    tokenType,
+                    subject: userClaims.sub,
+                    forceIntrospection,
+                });
+
+                const finalClaims = userRecord
+                    ? this.combineClaimsWithPriority(userRecord, userClaims)
+                    : userClaims;
+
+                await this.storeUserWithTimestamps(finalClaims, {
+                    lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
+                    lastIntrospection:
+                        tokenType === 'opaque' || forceIntrospection
+                            ? Date.now()
+                            : lastIntrospection,
+                });
+
+                return finalClaims;
+            }
+        }
+
+        const finalClaims = userRecord
+            ? this.combineClaimsWithPriority(userRecord, userClaims)
+            : userClaims;
+
+        await this.storeUserWithTimestamps(finalClaims, {
+            lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
+            lastIntrospection:
+                tokenType === 'opaque' || forceIntrospection
+                    ? Date.now()
+                    : lastIntrospection,
+        });
+
+        return finalClaims;
+    }
+
+    /**
+     * Extract user claims from any token-related response, filtering out metadata claims
+     * @param payload - Token payload or response with claims
+     * @param metadataClaims - List of metadata claims to exclude
+     * @returns User claims object
+     */
+    private extractUserClaims(
+        payload: Record<string, unknown>,
+        metadataClaims: string[] = [],
+    ): UserClaims {
+        const sub = (payload['sub'] as string) || '';
+        if (!sub) {
+            throw new Error('Payload missing required "sub" claim');
+        }
+
+        const userClaims: UserClaims = { sub };
+
+        for (const [key, value] of Object.entries(payload)) {
+            if (
+                key !== 'sub' &&
+                !metadataClaims.includes(key) &&
+                value !== undefined
+            ) {
+                userClaims[key] = value;
+            }
+        }
+
+        return userClaims;
     }
 }
