@@ -8,12 +8,12 @@ import type {
     UserInfoRefreshCondition,
     UserRecord,
 } from '../types/index.js';
-import { TokenType, UserClaimsSchema } from '../types/index.js';
 import {
     ConsoleLogger,
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
+import { TokenType, UserClaimsSchema } from '../types/index.js';
 import { InMemoryStorageAdapter } from '../storage/index.js';
 import type { IntrospectionResponse } from 'oauth4webapi';
 
@@ -136,7 +136,10 @@ export class Authenticator {
 
         if (this.shouldRefreshUserInfo(userRecord)) {
             try {
-                const userInfoClaims = await this.fetchUserInfo(token, userClaims.sub);
+                const userInfoClaims = await this.fetchUserInfo(
+                    token,
+                    userClaims.sub,
+                );
                 const finalClaims = this.combineClaimsWithPriority(
                     userClaims,
                     userInfoClaims,
@@ -158,10 +161,10 @@ export class Authenticator {
             }
         }
 
-        const finalClaims = userRecord 
+        const finalClaims = userRecord
             ? this.combineClaimsWithPriority(userRecord, userClaims)
             : userClaims;
-        
+
         await this.storeUserWithTimestamps(finalClaims, {
             lastIntrospection: Date.now(),
         });
@@ -188,14 +191,19 @@ export class Authenticator {
 
             if (this.shouldRefreshUserInfo(userRecord)) {
                 try {
-                    const userInfoClaims = await this.fetchUserInfo(token, userClaims.sub);
+                    const userInfoClaims = await this.fetchUserInfo(
+                        token,
+                        userClaims.sub,
+                    );
                     const finalClaims = this.combineClaimsWithPriority(
                         userClaims,
                         userInfoClaims,
                     );
                     await this.storeUserWithTimestamps(finalClaims, {
                         lastUserInfoRefresh: Date.now(),
-                        lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+                        lastIntrospection: forceIntrospection
+                            ? Date.now()
+                            : userRecord?.lastIntrospection,
                     });
                     return finalClaims;
                 } catch (error) {
@@ -204,24 +212,28 @@ export class Authenticator {
                         subject: userClaims.sub,
                         forceIntrospection,
                     });
-                    const finalClaims = userRecord 
+                    const finalClaims = userRecord
                         ? this.combineClaimsWithPriority(userRecord, userClaims)
                         : userClaims;
                     await this.storeUserWithTimestamps(finalClaims, {
                         lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
-                        lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+                        lastIntrospection: forceIntrospection
+                            ? Date.now()
+                            : userRecord?.lastIntrospection,
                     });
                     return finalClaims;
                 }
             }
 
-            const finalClaims = userRecord 
+            const finalClaims = userRecord
                 ? this.combineClaimsWithPriority(userRecord, userClaims)
                 : userClaims;
-            
+
             await this.storeUserWithTimestamps(finalClaims, {
                 lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
-                lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+                lastIntrospection: forceIntrospection
+                    ? Date.now()
+                    : userRecord?.lastIntrospection,
             });
             return finalClaims;
         } catch (error) {
@@ -345,11 +357,11 @@ export class Authenticator {
         context?: Record<string, unknown>,
     ): void {
         const message = `Failed to fetch UserInfo: ${error.message}`;
-        
+
         if (this.throwOnUserInfoFailure) {
             throw new Error(message);
         }
-        
+
         this.logger.log('warn', message, context);
     }
 
