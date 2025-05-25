@@ -1,8 +1,8 @@
-const js = require('@eslint/js');
-const ts = require('typescript-eslint');
-const prettier = require('eslint-plugin-prettier/recommended');
-const jsdoc = require('eslint-plugin-jsdoc');
-const globals = require('globals');
+import js from '@eslint/js';
+import ts from 'typescript-eslint';
+import prettier from 'eslint-plugin-prettier/recommended';
+import jsdoc from 'eslint-plugin-jsdoc';
+import globals from 'globals';
 
 // Common rule sets that can be reused across configurations
 const commonJsRules = {
@@ -36,7 +36,7 @@ const tsConfigs = ts.configs.recommended.map((config) =>
     !config.files ? { ...config, files: ['**/*.ts'] } : config,
 );
 
-module.exports = [
+const config = [
     // Files to exclude from linting
     {
         ignores: ['**/dist/**', '**/node_modules/**'],
@@ -85,3 +85,5 @@ module.exports = [
         },
     },
 ];
+
+export default config;

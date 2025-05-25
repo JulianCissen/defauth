@@ -1,5 +1,5 @@
-import * as openid from 'openid-client';
 import * as jose from 'jose';
+import * as openid from 'openid-client';
 import type {
     AuthenticatorConfig,
     StorageAdapter,
@@ -9,7 +9,6 @@ import type {
 } from '../types/index.js';
 import { TokenType, UserClaimsSchema } from '../types/index.js';
 import {
-    decodeJwtPayload,
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
@@ -23,7 +22,7 @@ export class Authenticator {
     private clientConfig?: openid.Configuration;
     private storageAdapter: StorageAdapter;
     private userInfoRefreshCondition: UserInfoRefreshCondition;
-    private isInitialized: boolean = false;
+    private isInitialized = false;
 
     /**
      * Creates an instance of the Authenticator
@@ -32,13 +31,9 @@ export class Authenticator {
     constructor(config: AuthenticatorConfig) {
         this.storageAdapter =
             config.storageAdapter || new InMemoryStorageAdapter();
-
-        // Handle userInfoRefreshCondition (new name) with fallback to introspectionCondition (old name)
         this.userInfoRefreshCondition =
-            config.userInfoRefreshCondition ||
-            defaultUserInfoRefreshCondition;
+            config.userInfoRefreshCondition || defaultUserInfoRefreshCondition;
 
-        // Initialize the client asynchronously
         this.initializeClient(config).catch((error) => {
             throw new Error(
                 `Failed to initialize OIDC client: ${error.message}`,
@@ -47,16 +42,48 @@ export class Authenticator {
     }
 
     /**
+     * Main method to get user details from a token
+     * @param token - The token (JWT or opaque)
+     * @param options - Optional settings for token processing
+     * @param options.forceIntrospection - Force token introspection even for valid JWTs
+     * @returns Promise resolving to user claims
+     * @throws Error if token is invalid or user cannot be retrieved
+     */
+    async getUser(
+        token: string,
+        options?: { forceIntrospection?: boolean },
+    ): Promise<UserClaims> {
+        this.validateToken(token);
+        this.ensureInitialized();
+
+        const tokenType = getTokenType(token);
+
+        if (tokenType === TokenType.OPAQUE) {
+            return this.handleOpaqueToken(token);
+        }
+
+        return this.handleJwtToken(token, options?.forceIntrospection);
+    }
+
+    /**
+     * Clear all cached user data (useful for testing)
+     */
+    async clearCache(): Promise<void> {
+        if (this.storageAdapter instanceof InMemoryStorageAdapter) {
+            this.storageAdapter.clear();
+        }
+    }
+
+    /**
      * Initialize the OIDC client
      * @param config - Configuration options
      */
     private async initializeClient(config: AuthenticatorConfig): Promise<void> {
         try {
-            // Call discovery with client ID and optional client secret
             this.clientConfig = await openid.discovery(
                 new URL(config.issuer),
                 config.clientId,
-                config.clientSecret, // This can be undefined for public clients
+                config.clientSecret,
             );
             this.isInitialized = true;
         } catch (error) {
@@ -67,32 +94,23 @@ export class Authenticator {
     }
 
     /**
-     * Main method to get user details from a token
-     * @param token - The token (JWT or opaque)
-     * @param options - Optional settings for token processing
-     * @param options.forceIntrospection
-     * @returns Promise resolving to user claims
-     * @throws Error if token is invalid or user cannot be retrieved
+     * Validate token input
+     * @param token - The token to validate
+     * @throws Error if token is invalid
      */
-    async getUser(
-        token: string,
-        options?: { forceIntrospection?: boolean },
-    ): Promise<UserClaims> {
+    private validateToken(token: string): void {
         if (!token) {
             throw new Error('Token is required');
         }
+    }
 
-        // Ensure client is initialized
+    /**
+     * Ensure client is initialized
+     * @throws Error if client is not initialized
+     */
+    private ensureInitialized(): void {
         if (!this.isInitialized || !this.clientConfig) {
             throw new Error('OIDC client is not initialized yet');
-        }
-
-        const tokenType = getTokenType(token);
-
-        if (tokenType === TokenType.OPAQUE) {
-            return this.handleOpaqueToken(token);
-        } else {
-            return this.handleJwtToken(token, options?.forceIntrospection);
         }
     }
 
@@ -102,96 +120,45 @@ export class Authenticator {
      * @returns Promise resolving to user claims
      */
     private async handleOpaqueToken(token: string): Promise<UserClaims> {
-        // Introspect the token (required for opaque tokens)
         const introspectionResult = await this.introspectToken(token);
+        this.validateIntrospectionResult(introspectionResult);
 
-        if (!introspectionResult.active) {
-            throw new Error('Token is not active');
-        }
-
-        // Convert the introspection response to user claims
         const userClaims =
             this.introspectionResponseToUserClaims(introspectionResult);
 
-        // Try to fetch additional user information if possible
-        try {
-            // Fetch fresh user info data
-            const userInfoClaims = await this.fetchUserInfo(
-                token,
-                userClaims.sub,
-            );
+        const userRecord = await this.storageAdapter.findUser(userClaims.sub);
 
-            // Create combined claims with priority to UserInfo data
-            const mergedClaims: UserClaims = { sub: userClaims.sub };
-
-            // First add claims from introspection
-            for (const [key, value] of Object.entries(userClaims)) {
-                if (key !== 'sub' && value !== undefined) {
-                    mergedClaims[key] = value;
-                }
+        if (this.shouldRefreshUserInfo(userRecord)) {
+            try {
+                const userInfoClaims = await this.fetchUserInfo(token, userClaims.sub);
+                const finalClaims = this.combineClaimsWithPriority(
+                    userClaims,
+                    userInfoClaims,
+                );
+                await this.storeUserWithTimestamps(finalClaims, {
+                    lastUserInfoRefresh: Date.now(),
+                    lastIntrospection: Date.now(),
+                });
+                return finalClaims;
+            } catch (error) {
+                console.warn(
+                    `Failed to fetch UserInfo: ${(error as Error).message}`,
+                );
+                await this.storeUserWithTimestamps(userClaims, {
+                    lastIntrospection: Date.now(),
+                });
+                return userClaims;
             }
-
-            // Then override with UserInfo claims
-            for (const [key, value] of Object.entries(userInfoClaims)) {
-                if (key !== 'sub' && value !== undefined) {
-                    mergedClaims[key] = value;
-                }
-            }
-
-            // Store the user with UserInfo timestamp
-            const userRecord: UserRecord = {
-                ...mergedClaims,
-                lastUserInfoRefresh: Date.now(),
-                lastIntrospection: Date.now(), // Also update introspection timestamp
-            };
-
-            await this.storageAdapter.storeUser(userRecord);
-            return mergedClaims;
-        } catch (error) {
-            // If UserInfo fetch fails, use introspection data only
-            console.warn(
-                `Failed to fetch UserInfo: ${(error as Error).message}`,
-            );
-
-            // Store the user with introspection timestamp only
-            const userRecord: UserRecord = {
-                ...userClaims,
-                lastIntrospection: Date.now(),
-            };
-
-            await this.storageAdapter.storeUser(userRecord);
-            return userClaims;
-        }
-    }
-
-    /**
-     * Verify the signature of a JWT token
-     * @param token - The JWT token to verify
-     * @returns Promise resolving to the verified JWT payload
-     * @throws Error if the token signature is invalid
-     */
-    private async verifyJwtSignature(token: string): Promise<jose.JWTVerifyResult> {
-        if (!this.clientConfig) {
-            throw new Error('OIDC client configuration is not initialized');
         }
 
-        try {
-            // Get the JWKS URI from the server metadata
-            const metadata = this.clientConfig.serverMetadata();
-            const jwksUri = metadata['jwks_uri'] as string;
-
-            if (!jwksUri) {
-                throw new Error('No JWKS URI found in server metadata');
-            }
-
-            // Create a JWKS client using jose
-            const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
-
-            // Verify the token using jose library
-            return await jose.jwtVerify(token, jwks);
-        } catch (error) {
-            throw new Error(`JWT signature verification failed: ${(error as Error).message}`);
-        }
+        const finalClaims = userRecord 
+            ? this.combineClaimsWithPriority(userRecord, userClaims)
+            : userClaims;
+        
+        await this.storeUserWithTimestamps(finalClaims, {
+            lastIntrospection: Date.now(),
+        });
+        return finalClaims;
     }
 
     /**
@@ -205,178 +172,205 @@ export class Authenticator {
         forceIntrospection?: boolean,
     ): Promise<UserClaims> {
         try {
-            let payload;
-            
-            // Verify the JWT signature unless introspection is forced
-            if (!forceIntrospection) {
+            const payload = await this.getValidatedJwtPayload(
+                token,
+                forceIntrospection,
+            );
+            const userClaims = this.createUserClaimsFromPayload(payload);
+            const userRecord = await this.storageAdapter.findUser(payload.sub);
+
+            if (this.shouldRefreshUserInfo(userRecord)) {
                 try {
-                    // Verify JWT signature using jose
-                    const { payload: verifiedPayload } = await this.verifyJwtSignature(token);
-                    // Convert to UserClaims and validate with Zod
-                    payload = UserClaimsSchema.parse(verifiedPayload);
-                } catch (verifyError) {
-                    throw new Error(`JWT validation failed: ${(verifyError as Error).message}`);
-                }
-            } else {
-                // If introspection is forced, just decode the payload without verification
-                // The introspection will verify the token validity later
-                const decodedPayload = decodeJwtPayload(token);
-                payload = UserClaimsSchema.parse(decodedPayload);
-            }
-
-            // Create a UserClaims object from the validated payload
-            // Start with the required sub claim
-            const userClaims: UserClaims = { sub: payload.sub };
-
-            // Define token metadata claims that shouldn't be included in user claims
-            const tokenMetadataClaims = [
-                'client_id', // Client the token was issued for
-                'scope', // Scopes associated with the token
-                'token_type', // Type of token
-                'nbf', // Not before time
-                'jti', // JWT ID
-            ];
-
-            // Copy all claims except token metadata
-            for (const [key, value] of Object.entries(payload)) {
-                if (
-                    key !== 'sub' && // Already added
-                    !tokenMetadataClaims.includes(key) &&
-                    value !== undefined
-                ) {
-                    userClaims[key] = value;
-                }
-            }
-
-            // Look for existing user in storage
-            let userRecord = await this.storageAdapter.findUser(payload.sub);
-
-            // Force token introspection if requested
-            if (forceIntrospection) {
-                // Introspect to verify token and get additional claims
-                const introspectionResult = await this.introspectToken(token);
-
-                if (!introspectionResult.active) {
-                    throw new Error('Token is not active');
-                }
-
-                const introspectionClaims =
-                    this.introspectionResponseToUserClaims(introspectionResult);
-
-                // Merge claims from JWT and introspection with priority to introspection
-                for (const [key, value] of Object.entries(
-                    introspectionClaims,
-                )) {
-                    if (key !== 'sub' && value !== undefined) {
-                        userClaims[key] = value;
-                    }
-                }
-            }
-
-            // Determine if we need to refresh user info
-            const needsUserInfoRefresh =
-                !userRecord ||
-                !userRecord.lastUserInfoRefresh ||
-                this.userInfoRefreshCondition(userRecord);
-
-            if (needsUserInfoRefresh) {
-                try {
-                    // Fetch fresh user data from UserInfo endpoint
-                    const userInfoClaims = await this.fetchUserInfo(
-                        token,
-                        payload.sub,
+                    const userInfoClaims = await this.fetchUserInfo(token, userClaims.sub);
+                    const finalClaims = this.combineClaimsWithPriority(
+                        userClaims,
+                        userInfoClaims,
                     );
-
-                    // Create combined claims object with priority to UserInfo data
-                    const combinedClaims: UserClaims = { sub: userClaims.sub };
-
-                    // First add all JWT/introspection claims
-                    for (const [key, value] of Object.entries(userClaims)) {
-                        if (key !== 'sub' && value !== undefined) {
-                            combinedClaims[key] = value;
-                        }
-                    }
-
-                    // Then override with UserInfo claims (highest priority)
-                    for (const [key, value] of Object.entries(userInfoClaims)) {
-                        if (key !== 'sub' && value !== undefined) {
-                            combinedClaims[key] = value;
-                        }
-                    }
-
-                    // Update storage with fresh data and both timestamps
-                    userRecord = {
-                        ...combinedClaims,
+                    await this.storeUserWithTimestamps(finalClaims, {
                         lastUserInfoRefresh: Date.now(),
-                        lastIntrospection: forceIntrospection
-                            ? Date.now()
-                            : userRecord?.lastUserInfoRefresh,
-                    };
-
-                    await this.storageAdapter.storeUser(userRecord);
-                    return combinedClaims;
+                        lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+                    });
+                    return finalClaims;
                 } catch (error) {
-                    // If UserInfo fetch fails but we have valid JWT/introspection data, continue
                     console.warn(
                         `Failed to fetch UserInfo: ${(error as Error).message}`,
                     );
+                    const finalClaims = userRecord 
+                        ? this.combineClaimsWithPriority(userRecord, userClaims)
+                        : userClaims;
+                    await this.storeUserWithTimestamps(finalClaims, {
+                        lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
+                        lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+                    });
+                    return finalClaims;
                 }
             }
 
-            // If we get here, either UserInfo fetch wasn't needed or failed
-            // Use cached user data if available, merged with current JWT claims
-            if (userRecord) {
-                // Use cached user data, but prioritize JWT/introspection claims for freshness
-                const {
-                    lastUserInfoRefresh,
-                    lastIntrospection,
-                    ...cachedClaims
-                } = userRecord;
-
-                // Create combined claims object with priority to current JWT/introspection
-                const combinedClaims: UserClaims = { sub: userClaims.sub };
-
-                // First add all cached claims
-                for (const [key, value] of Object.entries(cachedClaims)) {
-                    if (key !== 'sub' && value !== undefined) {
-                        combinedClaims[key] = value;
-                    }
-                }
-
-                // Then override with any JWT/introspection claims
-                for (const [key, value] of Object.entries(userClaims)) {
-                    if (key !== 'sub' && value !== undefined) {
-                        combinedClaims[key] = value;
-                    }
-                }
-
-                // Update storage if anything changed
-                const newUserRecord = {
-                    ...combinedClaims,
-                    lastUserInfoRefresh: userRecord.lastUserInfoRefresh,
-                    lastIntrospection: forceIntrospection
-                        ? Date.now()
-                        : userRecord.lastUserInfoRefresh,
-                };
-
-                await this.storageAdapter.storeUser(newUserRecord);
-                return combinedClaims;
-            }
-
-            // No existing user record and UserInfo fetch failed
-            // Store the JWT claims and return them
-            userRecord = {
-                ...userClaims,
-                lastIntrospection: forceIntrospection ? Date.now() : undefined,
-            };
-
-            await this.storageAdapter.storeUser(userRecord);
-            return userClaims;
+            const finalClaims = userRecord 
+                ? this.combineClaimsWithPriority(userRecord, userClaims)
+                : userClaims;
+            
+            await this.storeUserWithTimestamps(finalClaims, {
+                lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
+                lastIntrospection: forceIntrospection ? Date.now() : userRecord?.lastIntrospection,
+            });
+            return finalClaims;
         } catch (error) {
             throw new Error(
                 `Failed to process JWT token: ${(error as Error).message}`,
             );
         }
+    }
+
+    /**
+     * Get validated JWT payload, either through signature verification or introspection
+     * @param token - The JWT token
+     * @param forceIntrospection - Whether to use introspection instead of signature verification
+     * @returns Promise resolving to validated payload
+     */
+    private async getValidatedJwtPayload(
+        token: string,
+        forceIntrospection?: boolean,
+    ) {
+        if (forceIntrospection) {
+            const introspectionResult = await this.introspectToken(token);
+            this.validateIntrospectionResult(introspectionResult);
+            return this.introspectionResponseToUserClaims(introspectionResult);
+        }
+
+        const { payload: verifiedPayload } =
+            await this.verifyJwtSignature(token);
+        return UserClaimsSchema.parse(verifiedPayload);
+    }
+
+    /**
+     * Verify the signature of a JWT token
+     * @param token - The JWT token to verify
+     * @returns Promise resolving to the verified JWT payload
+     * @throws Error if the token signature is invalid
+     */
+    private async verifyJwtSignature(
+        token: string,
+    ): Promise<jose.JWTVerifyResult> {
+        if (!this.clientConfig) {
+            throw new Error('OIDC client configuration is not initialized');
+        }
+
+        try {
+            const metadata = this.clientConfig.serverMetadata();
+            const jwksUri = metadata['jwks_uri'] as string;
+
+            if (!jwksUri) {
+                throw new Error('No JWKS URI found in server metadata');
+            }
+
+            const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
+            return await jose.jwtVerify(token, jwks);
+        } catch (error) {
+            throw new Error(
+                `JWT signature verification failed: ${(error as Error).message}`,
+            );
+        }
+    }
+
+    /**
+     * Create user claims object from JWT payload, filtering out token metadata
+     * @param payload - The validated JWT payload
+     * @returns User claims object
+     */
+    private createUserClaimsFromPayload(payload: UserClaims): UserClaims {
+        const userClaims: UserClaims = { sub: payload.sub };
+        const tokenMetadataClaims = [
+            'client_id',
+            'scope',
+            'token_type',
+            'nbf',
+            'jti',
+        ];
+
+        for (const [key, value] of Object.entries(payload)) {
+            if (
+                key !== 'sub' &&
+                !tokenMetadataClaims.includes(key) &&
+                value !== undefined
+            ) {
+                userClaims[key] = value;
+            }
+        }
+
+        return userClaims;
+    }
+
+    /**
+     * Determine if user info should be refreshed
+     * @param userRecord - Existing user record or null
+     * @returns True if refresh is needed
+     */
+    private shouldRefreshUserInfo(userRecord: UserRecord | null): boolean {
+        return (
+            !userRecord ||
+            !userRecord.lastUserInfoRefresh ||
+            this.userInfoRefreshCondition(userRecord)
+        );
+    }
+
+    /**
+     * Validate introspection result
+     * @param result - The introspection response
+     * @throws Error if token is not active
+     */
+    private validateIntrospectionResult(result: IntrospectionResponse): void {
+        if (!result.active) {
+            throw new Error('Token is not active');
+        }
+    }
+
+    /**
+     * Store user record with timestamp metadata
+     * @param userClaims - User claims to store
+     * @param timestamps - Timestamp metadata
+     * @param timestamps.lastUserInfoRefresh - Last UserInfo refresh timestamp
+     * @param timestamps.lastIntrospection - Last token introspection timestamp
+     */
+    private async storeUserWithTimestamps(
+        userClaims: UserClaims,
+        timestamps: {
+            lastUserInfoRefresh?: number;
+            lastIntrospection?: number;
+        },
+    ): Promise<void> {
+        const userRecord: UserRecord = {
+            ...userClaims,
+            ...timestamps,
+        };
+        await this.storageAdapter.storeUser(userRecord);
+    }
+
+    /**
+     * Combine claims with priority to the second parameter
+     * @param baseClaims - Base claims
+     * @param priorityClaims - Priority claims that override base
+     * @returns Combined claims
+     */
+    private combineClaimsWithPriority(
+        baseClaims: UserClaims,
+        priorityClaims: UserClaims,
+    ): UserClaims {
+        const combinedClaims: UserClaims = { sub: baseClaims.sub };
+
+        for (const [key, value] of Object.entries(baseClaims)) {
+            if (key !== 'sub' && value !== undefined) {
+                combinedClaims[key] = value;
+            }
+        }
+
+        for (const [key, value] of Object.entries(priorityClaims)) {
+            if (key !== 'sub' && value !== undefined) {
+                combinedClaims[key] = value;
+            }
+        }
+
+        return combinedClaims;
     }
 
     /**
@@ -392,27 +386,10 @@ export class Authenticator {
         }
 
         try {
-            // Use openid client's built-in token introspection function
-            const metadata = this.clientConfig.serverMetadata();
-
-            // Get the introspection endpoint
-            const tokenIntrospectionEndpoint = metadata[
-                'token_introspection_endpoint'
-            ] as string;
-            if (!tokenIntrospectionEndpoint) {
-                throw new Error(
-                    'No token introspection endpoint found in server metadata',
-                );
-            }
-
-            // Use the openid-client's tokenIntrospection function
-            // This handles all the necessary authentication and formatting
-            const introspectionResponse = await openid.tokenIntrospection(
+            return (await openid.tokenIntrospection(
                 this.clientConfig,
                 token,
-            );
-
-            return introspectionResponse as IntrospectionResponse;
+            )) as IntrospectionResponse;
         } catch (error) {
             throw new Error(
                 `Failed to introspect token: ${(error as Error).message}`,
@@ -428,7 +405,6 @@ export class Authenticator {
     private introspectionResponseToUserClaims(
         response: IntrospectionResponse,
     ): UserClaims {
-        // Ensure we have a sub claim, which is the only required claim
         const sub = response.sub || '';
         if (!sub) {
             throw new Error(
@@ -436,23 +412,19 @@ export class Authenticator {
             );
         }
 
-        // Create a minimal user claims object with only the required 'sub' property
         const userClaims: UserClaims = { sub };
-
-        // Define token metadata claims that shouldn't be considered user claims
         const tokenMetadataClaims = [
-            'active', // Introspection-specific field
-            'client_id', // Client the token was issued for
-            'scope', // Scopes associated with the token
-            'token_type', // Type of token
-            'nbf', // Not before time
-            'jti', // JWT ID
+            'active',
+            'client_id',
+            'scope',
+            'token_type',
+            'nbf',
+            'jti',
         ];
 
-        // Copy all claims from the response except token metadata
         for (const [key, value] of Object.entries(response)) {
             if (
-                key !== 'sub' && // Already added
+                key !== 'sub' &&
                 !tokenMetadataClaims.includes(key) &&
                 value !== undefined
             ) {
@@ -466,7 +438,7 @@ export class Authenticator {
     /**
      * Fetch user information from the OIDC provider's UserInfo endpoint
      * @param token - The access token to use for authentication
-     * @param expectedSubject
+     * @param expectedSubject - Expected subject identifier for validation
      * @returns Promise resolving to user claims
      */
     private async fetchUserInfo(
@@ -478,7 +450,6 @@ export class Authenticator {
         }
 
         try {
-            // Get the UserInfo endpoint from the server metadata
             const metadata = this.clientConfig.serverMetadata();
             const userInfoEndpoint = metadata['userinfo_endpoint'] as string;
 
@@ -488,24 +459,20 @@ export class Authenticator {
                 );
             }
 
-            // Use openid-client's built-in fetchUserInfo function
             const userInfoResponse = await openid.fetchUserInfo(
                 this.clientConfig,
                 token,
                 expectedSubject,
             );
 
-            // Ensure we have a sub claim
             if (!userInfoResponse.sub) {
                 throw new Error(
                     'UserInfo response missing required "sub" claim',
                 );
             }
 
-            // Create a base UserClaims object with the required sub property
             const userClaims: UserClaims = { sub: userInfoResponse.sub };
 
-            // Copy all other claims from the userInfo response
             for (const [key, value] of Object.entries(userInfoResponse)) {
                 if (key !== 'sub' && value !== undefined) {
                     userClaims[key] = value;
@@ -517,15 +484,6 @@ export class Authenticator {
             throw new Error(
                 `Failed to fetch user info: ${(error as Error).message}`,
             );
-        }
-    }
-
-    /**
-     * Clear all cached user data (useful for testing or reset)
-     */
-    async clearCache(): Promise<void> {
-        if (this.storageAdapter instanceof InMemoryStorageAdapter) {
-            this.storageAdapter.clear();
         }
     }
 }

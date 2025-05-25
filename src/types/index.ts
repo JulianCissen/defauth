@@ -32,6 +32,8 @@ export interface UserClaims {
 export interface UserRecord extends UserClaims {
     /** Timestamp of last user info refresh (in milliseconds) */
     lastUserInfoRefresh?: number;
+    /** Timestamp of last introspection (in milliseconds) */
+    lastIntrospection?: number;
 }
 
 /**
@@ -39,6 +41,7 @@ export interface UserRecord extends UserClaims {
  */
 export const UserRecordSchema = UserClaimsSchema.extend({
     lastUserInfoRefresh: z.number().optional(),
+    lastIntrospection: z.number().optional(),
 });
 
 /**

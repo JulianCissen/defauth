@@ -1,7 +1,7 @@
 /**
  * Exports the Prettier configuration.
  */
-module.exports = {
+export default {
     singleQuote: true,
     tabWidth: 4,
 };
