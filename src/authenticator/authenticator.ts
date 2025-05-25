@@ -1,4 +1,5 @@
 import * as openid from 'openid-client';
+import * as jose from 'jose';
 import type {
     AuthenticatorConfig,
     StorageAdapter,
@@ -164,6 +165,36 @@ export class Authenticator {
     }
 
     /**
+     * Verify the signature of a JWT token
+     * @param token - The JWT token to verify
+     * @returns Promise resolving to the verified JWT payload
+     * @throws Error if the token signature is invalid
+     */
+    private async verifyJwtSignature(token: string): Promise<jose.JWTVerifyResult> {
+        if (!this.clientConfig) {
+            throw new Error('OIDC client configuration is not initialized');
+        }
+
+        try {
+            // Get the JWKS URI from the server metadata
+            const metadata = this.clientConfig.serverMetadata();
+            const jwksUri = metadata['jwks_uri'] as string;
+
+            if (!jwksUri) {
+                throw new Error('No JWKS URI found in server metadata');
+            }
+
+            // Create a JWKS client using jose
+            const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
+
+            // Verify the token using jose library
+            return await jose.jwtVerify(token, jwks);
+        } catch (error) {
+            throw new Error(`JWT signature verification failed: ${(error as Error).message}`);
+        }
+    }
+
+    /**
      * Handle JWT token with signature verification and conditional introspection
      * @param token - The JWT token
      * @param forceIntrospection - Whether to force token introspection regardless of conditions
@@ -174,11 +205,24 @@ export class Authenticator {
         forceIntrospection?: boolean,
     ): Promise<UserClaims> {
         try {
-            // Parse and validate the JWT payload
-            const decodedPayload = decodeJwtPayload(token);
-
-            // Validate the payload with Zod
-            const payload = UserClaimsSchema.parse(decodedPayload);
+            let payload;
+            
+            // Verify the JWT signature unless introspection is forced
+            if (!forceIntrospection) {
+                try {
+                    // Verify JWT signature using jose
+                    const { payload: verifiedPayload } = await this.verifyJwtSignature(token);
+                    // Convert to UserClaims and validate with Zod
+                    payload = UserClaimsSchema.parse(verifiedPayload);
+                } catch (verifyError) {
+                    throw new Error(`JWT validation failed: ${(verifyError as Error).message}`);
+                }
+            } else {
+                // If introspection is forced, just decode the payload without verification
+                // The introspection will verify the token validity later
+                const decodedPayload = decodeJwtPayload(token);
+                payload = UserClaimsSchema.parse(decodedPayload);
+            }
 
             // Create a UserClaims object from the validated payload
             // Start with the required sub claim
