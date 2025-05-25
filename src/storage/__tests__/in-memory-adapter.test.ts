@@ -191,4 +191,54 @@ describe('InMemoryStorageAdapter', () => {
             expect(retrieved).toEqual(userWithUndefined);
         });
     });
+
+    describe('getAllUsers', () => {
+        it('should return empty array when no users stored', () => {
+            const users = adapter.getAllUsers();
+            expect(users).toEqual([]);
+            expect(Array.isArray(users)).toBe(true);
+        });
+
+        it('should return all stored users', async () => {
+            const user1: UserRecord = {
+                sub: 'user1',
+                name: 'First User',
+                email: 'first@example.com',
+            };
+
+            const user2: UserRecord = {
+                sub: 'user2',
+                name: 'Second User',
+                email: 'second@example.com',
+            };
+
+            await adapter.storeUser(user1);
+            await adapter.storeUser(user2);
+
+            const users = adapter.getAllUsers();
+            expect(users).toHaveLength(2);
+            expect(users).toContainEqual(user1);
+            expect(users).toContainEqual(user2);
+        });
+
+        it('should return updated user data', async () => {
+            await adapter.storeUser(mockUser);
+
+            const updatedUser = { ...mockUser, name: 'Updated Name' };
+            await adapter.storeUser(updatedUser);
+
+            const users = adapter.getAllUsers();
+            expect(users).toHaveLength(1);
+            expect(users[0]).toEqual(updatedUser);
+            expect(users[0]?.['name']).toBe('Updated Name');
+        });
+
+        it('should return empty array after clear', async () => {
+            await adapter.storeUser(mockUser);
+            expect(adapter.getAllUsers()).toHaveLength(1);
+
+            adapter.clear();
+            expect(adapter.getAllUsers()).toEqual([]);
+        });
+    });
 });

@@ -16,7 +16,12 @@ export default {
     transformIgnorePatterns: ['node_modules/(?!(jose|openid-client)/)'],
     testMatch: ['**/__tests__/**/*.test.ts'],
     collectCoverage: true,
-    collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/**/index.ts'],
+    collectCoverageFrom: [
+        'src/**/*.ts',
+        '!src/**/*.d.ts',
+        '!src/**/index.ts',
+        '!src/**/__tests__/**'
+    ],
     coverageDirectory: 'coverage',
     coverageReporters: ['text', 'lcov', 'html'],
 };
