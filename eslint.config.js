@@ -1,8 +1,8 @@
+import eslintPluginPrettier from 'eslint-plugin-prettier/recommended';
+import globals from 'globals';
+import jsdoc from 'eslint-plugin-jsdoc';
 import js from '@eslint/js';
 import ts from 'typescript-eslint';
-import prettier from 'eslint-plugin-prettier/recommended';
-import jsdoc from 'eslint-plugin-jsdoc';
-import globals from 'globals';
 
 // Common rule sets that can be reused across configurations
 const commonJsRules = {
@@ -57,7 +57,7 @@ const config = [
     ...tsConfigs,
     jsdoc.configs['flat/recommended'],
     jsdoc.configs['flat/recommended-typescript'],
-    prettier,
+    eslintPluginPrettier,
 
     // JavaScript-specific configuration
     {
@@ -82,6 +82,14 @@ const config = [
         rules: {
             ...commonJsRules,
             ...commonTsRules,
+        },
+    },
+
+    // Test files configuration - allow explicit any types
+    {
+        files: ['**/__tests__/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
+        rules: {
+            '@typescript-eslint/no-explicit-any': 'off',
         },
     },
 ];

@@ -27,6 +27,7 @@ export class Authenticator {
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
     private isInitialized = false;
+    private initializationError?: Error;
 
     /**
      * Creates an instance of the Authenticator
@@ -41,9 +42,12 @@ export class Authenticator {
         this.throwOnUserInfoFailure = config.throwOnUserInfoFailure || false;
 
         this.initializeClient(config).catch((error) => {
-            throw new Error(
+            this.initializationError = new Error(
                 `Failed to initialize OIDC client: ${error.message}`,
             );
+            this.logger.log('error', 'OIDC client initialization failed', {
+                error: error.message,
+            });
         });
     }
 
@@ -115,6 +119,9 @@ export class Authenticator {
      * @throws Error if client is not initialized
      */
     private ensureInitialized(): void {
+        if (this.initializationError) {
+            throw this.initializationError;
+        }
         if (!this.isInitialized || !this.clientConfig) {
             throw new Error('OIDC client is not initialized yet');
         }
