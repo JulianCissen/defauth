@@ -121,6 +121,44 @@ describe('Authenticator', () => {
                 'Failed to initialize OIDC client: Failed to discover OIDC issuer or create client: Discovery failed',
             );
         });
+
+        it('should handle getUser called immediately during initialization (race condition)', async () => {
+            // Set up a slower initialization to simulate race condition
+            let resolveDiscovery: (value: any) => void = () => {};
+            const discoveryPromise = new Promise((resolve) => {
+                resolveDiscovery = resolve;
+            });
+            openidMock.discovery.mockReturnValue(discoveryPromise as never);
+
+            // Create authenticator (initialization starts immediately)
+            const authenticator = new Authenticator(mockConfig);
+
+            // Call getUser immediately without waiting for initialization
+            // This should wait for initialization to complete, not throw an error
+            const getUserPromise = authenticator.getUser(MOCK_JWT_TOKEN);
+
+            // Complete the initialization
+            resolveDiscovery(createMockOpenidClient());
+
+            // getUser should now succeed after waiting for initialization
+            const result = await getUserPromise;
+
+            expect(result).toEqual(
+                expect.objectContaining({
+                    sub: MOCK_USER_CLAIMS.sub,
+                    name: expect.any(String),
+                    email: expect.any(String),
+                }),
+            );
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    clockTolerance: '1 minute',
+                    requiredClaims: ['sub', 'exp'],
+                }),
+            );
+        });
     });
 
     describe('Token Validation', () => {
@@ -504,9 +542,11 @@ describe('Authenticator', () => {
             it('should throw error when client config missing during JWT verification', async () => {
                 // Create authenticator that will have no clientConfig
                 const brokenAuthenticator = new Authenticator(mockConfig);
-                // Access private property to force the condition
+                // Wait for initialization to complete first
+                await waitForAsync();
+
+                // Now force the broken state
                 (brokenAuthenticator as any).clientConfig = undefined;
-                (brokenAuthenticator as any).isInitialized = true; // bypass initialization check
 
                 await expect(
                     brokenAuthenticator.getUser(MOCK_JWT_TOKEN),
@@ -516,8 +556,11 @@ describe('Authenticator', () => {
             it('should throw error when client config missing during token introspection', async () => {
                 // Create authenticator and force missing clientConfig during introspection
                 const brokenAuthenticator = new Authenticator(mockConfig);
+                // Wait for initialization to complete first
+                await waitForAsync();
+
+                // Now force the broken state
                 (brokenAuthenticator as any).clientConfig = undefined;
-                (brokenAuthenticator as any).isInitialized = true;
 
                 await expect(
                     brokenAuthenticator.getUser(MOCK_OPAQUE_TOKEN),
@@ -914,17 +957,26 @@ describe('Authenticator', () => {
 
         describe('Initialization Edge Cases', () => {
             it('should reject requests when OIDC client is not initialized', async () => {
+                // Mock discovery to fail so initialization will fail
+                openidMock.discovery.mockRejectedValue(
+                    new Error('Discovery failed'),
+                );
+
                 const uninitializedAuth = new Authenticator(mockConfig);
-                // Don't wait for initialization
+                // Wait for initialization to fail
+                await waitForAsync();
 
                 await expect(
                     uninitializedAuth.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('OIDC client is not initialized yet');
+                ).rejects.toThrow('Failed to initialize OIDC client');
             });
 
             it('should reject requests when client is in partially initialized state', async () => {
                 const partialAuth = new Authenticator(mockConfig);
-                // Force partial initialization state
+                // Wait for initialization to complete first
+                await waitForAsync();
+
+                // Force partial initialization state after successful init
                 (partialAuth as any).isInitialized = true;
                 (partialAuth as any).clientConfig = null;
 

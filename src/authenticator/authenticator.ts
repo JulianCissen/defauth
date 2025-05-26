@@ -40,6 +40,7 @@ export class Authenticator<TUser extends StorageMetadata> {
     private globalJwtValidationOptions: JwtValidationOptions;
     private isInitialized = false;
     private initializationError?: Error;
+    private initializationPromise: Promise<void>;
 
     private static readonly JWT_METADATA_CLAIMS = [
         'client_id',
@@ -74,15 +75,19 @@ export class Authenticator<TUser extends StorageMetadata> {
             clockTolerance: '1 minute',
         };
 
-        this.initializeClient(config).catch((error) => {
-            this.initializationError = new InitializationError(
-                'Failed to initialize OIDC client',
-                error as Error,
-            );
-            this.logger.log('error', 'OIDC client initialization failed', {
-                error: error.message,
-            });
-        });
+        // Create initialization promise that always resolves (errors stored in initializationError)
+        this.initializationPromise = this.initializeClient(config).catch(
+            (error) => {
+                this.initializationError = new InitializationError(
+                    'Failed to initialize OIDC client',
+                    error as Error,
+                );
+                this.logger.log('error', 'OIDC client initialization failed', {
+                    error: error.message,
+                });
+                // Don't re-throw - let the promise resolve so ensureInitialized can handle the error
+            },
+        );
     }
 
     /**
@@ -100,7 +105,7 @@ export class Authenticator<TUser extends StorageMetadata> {
         options?: JwtValidationOptions,
     ): Promise<TUser> {
         this.validateToken(token);
-        this.ensureInitialized();
+        await this.ensureInitialized();
 
         const tokenType = getTokenType(token);
 
@@ -155,9 +160,11 @@ export class Authenticator<TUser extends StorageMetadata> {
 
     /**
      * Ensure client is initialized
-     * @throws Error if client is not initialized
+     * @returns Promise that resolves when client is ready or rejects if initialization failed
      */
-    private ensureInitialized(): void {
+    private async ensureInitialized(): Promise<void> {
+        await this.initializationPromise;
+
         if (this.initializationError) {
             throw this.initializationError;
         }
