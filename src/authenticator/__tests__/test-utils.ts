@@ -3,6 +3,7 @@ import type {
     IntrospectionResponse,
     Logger,
     StorageAdapter,
+    StorageMetadata,
     TokenContext,
     UserClaims,
     UserRecord,
@@ -110,9 +111,19 @@ export class MockStorageAdapter implements StorageAdapter {
         return this.storage.get(context.sub) || null;
     }
 
-    async storeUser(user: UserRecord): Promise<void> {
-        this.storeUserCalls.push({ ...user });
-        this.storage.set(user.sub, user);
+    async storeUser(
+        user: UserRecord | null,
+        newClaims: UserClaims,
+        metadata: StorageMetadata,
+    ): Promise<UserRecord> {
+        // Create user record from claims if user is null, otherwise merge with existing
+        const updatedUser = user
+            ? ({ ...user, ...newClaims, ...metadata } as UserRecord)
+            : ({ ...newClaims, ...metadata } as UserRecord);
+
+        this.storeUserCalls.push({ ...updatedUser });
+        this.storage.set(updatedUser.sub, updatedUser);
+        return Promise.resolve(updatedUser);
     }
 
     // Test utilities

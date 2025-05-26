@@ -21,9 +21,9 @@ import type { IntrospectionResponse } from 'oauth4webapi';
 /**
  * Main authenticator class that handles OIDC authentication and user management
  */
-export class Authenticator {
+export class Authenticator<TUser extends UserRecord = UserRecord> {
     private clientConfig?: openid.Configuration;
-    private storageAdapter: StorageAdapter;
+    private storageAdapter: StorageAdapter<TUser>;
     private userInfoRefreshCondition: UserInfoRefreshCondition;
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
@@ -34,9 +34,9 @@ export class Authenticator {
      * Creates an instance of the Authenticator
      * @param config - Configuration options for the authenticator
      */
-    constructor(config: AuthenticatorConfig) {
+    constructor(config: AuthenticatorConfig<TUser>) {
         this.storageAdapter =
-            config.storageAdapter || new InMemoryStorageAdapter();
+            config.storageAdapter || new InMemoryStorageAdapter<TUser>();
         this.userInfoRefreshCondition =
             config.userInfoRefreshCondition || defaultUserInfoRefreshCondition;
         this.logger = config.logger || new ConsoleLogger();
@@ -63,7 +63,7 @@ export class Authenticator {
     async getUser(
         token: string,
         options?: { forceIntrospection?: boolean },
-    ): Promise<UserClaims> {
+    ): Promise<TUser> {
         this.validateToken(token);
         this.ensureInitialized();
 
@@ -89,7 +89,9 @@ export class Authenticator {
      * Initialize the OIDC client
      * @param config - Configuration options
      */
-    private async initializeClient(config: AuthenticatorConfig): Promise<void> {
+    private async initializeClient(
+        config: AuthenticatorConfig<TUser>,
+    ): Promise<void> {
         try {
             this.clientConfig = await openid.discovery(
                 new URL(config.issuer),
@@ -133,7 +135,7 @@ export class Authenticator {
      * @param token - The opaque token
      * @returns Promise resolving to user claims
      */
-    private async handleOpaqueToken(token: string): Promise<UserClaims> {
+    private async handleOpaqueToken(token: string): Promise<TUser> {
         const introspectionResult = await this.introspectToken(token);
         this.validateIntrospectionResult(introspectionResult);
 
@@ -167,7 +169,7 @@ export class Authenticator {
     private async handleJwtToken(
         token: string,
         forceIntrospection?: boolean,
-    ): Promise<UserClaims> {
+    ): Promise<TUser> {
         try {
             const validationResult = await this.getValidatedJwtPayload(
                 token,
@@ -300,7 +302,7 @@ export class Authenticator {
      * @param userRecord - Existing user record or null
      * @returns True if refresh is needed
      */
-    private shouldRefreshUserInfo(userRecord: UserRecord | null): boolean {
+    private shouldRefreshUserInfo(userRecord: TUser | null): boolean {
         return (
             !userRecord ||
             !userRecord.lastUserInfoRefresh ||
@@ -336,27 +338,6 @@ export class Authenticator {
         }
 
         this.logger.log('warn', message, context);
-    }
-
-    /**
-     * Store user record with timestamp metadata
-     * @param userClaims - User claims to store
-     * @param timestamps - Timestamp metadata
-     * @param timestamps.lastUserInfoRefresh - Last UserInfo refresh timestamp
-     * @param timestamps.lastIntrospection - Last token introspection timestamp
-     */
-    private async storeUserWithTimestamps(
-        userClaims: UserClaims,
-        timestamps: {
-            lastUserInfoRefresh?: number;
-            lastIntrospection?: number;
-        },
-    ): Promise<void> {
-        const userRecord: UserRecord = {
-            ...userClaims,
-            ...timestamps,
-        };
-        await this.storageAdapter.storeUser(userRecord);
     }
 
     /**
@@ -484,13 +465,15 @@ export class Authenticator {
         userClaims: UserClaims,
         options: {
             tokenType: 'jwt' | 'opaque';
-            userRecord: UserRecord | null;
+            userRecord: TUser | null;
             lastIntrospection?: number;
             forceIntrospection?: boolean;
         },
-    ): Promise<UserClaims> {
+    ): Promise<TUser> {
         const { tokenType, userRecord, lastIntrospection, forceIntrospection } =
             options;
+        let finalClaims = userClaims;
+        let userInfoRefreshTime = userRecord?.lastUserInfoRefresh;
 
         if (this.shouldRefreshUserInfo(userRecord)) {
             try {
@@ -498,56 +481,28 @@ export class Authenticator {
                     token,
                     userClaims.sub,
                 );
-                const finalClaims = this.combineClaimsWithPriority(
-                    userClaims,
+                // Apply claims changes on the user object
+                finalClaims = this.combineClaimsWithPriority(
+                    finalClaims,
                     userInfoClaims,
                 );
-
-                await this.storeUserWithTimestamps(finalClaims, {
-                    lastUserInfoRefresh: Date.now(),
-                    lastIntrospection:
-                        tokenType === 'opaque' || forceIntrospection
-                            ? Date.now()
-                            : lastIntrospection,
-                });
-
-                return finalClaims;
+                userInfoRefreshTime = Date.now();
             } catch (error) {
                 this.handleUserInfoFailure(error as Error, {
                     tokenType,
                     subject: userClaims.sub,
                     forceIntrospection,
                 });
-
-                const finalClaims = userRecord
-                    ? this.combineClaimsWithPriority(userRecord, userClaims)
-                    : userClaims;
-
-                await this.storeUserWithTimestamps(finalClaims, {
-                    lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
-                    lastIntrospection:
-                        tokenType === 'opaque' || forceIntrospection
-                            ? Date.now()
-                            : lastIntrospection,
-                });
-
-                return finalClaims;
             }
         }
 
-        const finalClaims = userRecord
-            ? this.combineClaimsWithPriority(userRecord, userClaims)
-            : userClaims;
-
-        await this.storeUserWithTimestamps(finalClaims, {
-            lastUserInfoRefresh: userRecord?.lastUserInfoRefresh,
+        return await this.storageAdapter.storeUser(userRecord, finalClaims, {
+            lastUserInfoRefresh: userInfoRefreshTime,
             lastIntrospection:
                 tokenType === 'opaque' || forceIntrospection
                     ? Date.now()
                     : lastIntrospection,
         });
-
-        return finalClaims;
     }
 
     /**

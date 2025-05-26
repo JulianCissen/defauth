@@ -22,7 +22,7 @@ describe('Authenticator Components', () => {
                 lastUserInfoRefresh: Date.now(),
             };
 
-            await storageAdapter.storeUser(user);
+            await storageAdapter.storeUser(user, user, {});
             const retrievedUser = await storageAdapter.findUser(
                 createJwtTokenContext('user123'),
             );

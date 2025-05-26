@@ -26,7 +26,7 @@ describe('InMemoryStorageAdapter', () => {
 
     describe('storeUser', () => {
         it('should store a user successfully', async () => {
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             const retrievedUser = await adapter.findUser(
                 createJwtTokenContext('user123'),
@@ -36,7 +36,7 @@ describe('InMemoryStorageAdapter', () => {
 
         it('should update existing user', async () => {
             // Store initial user
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             // Update user with new data
             const updatedUser: UserRecord = {
@@ -45,7 +45,7 @@ describe('InMemoryStorageAdapter', () => {
                 email: 'updated@example.com',
             };
 
-            await adapter.storeUser(updatedUser);
+            await adapter.storeUser(updatedUser, updatedUser, {});
 
             const retrievedUser = await adapter.findUser(
                 createJwtTokenContext('user123'),
@@ -60,7 +60,7 @@ describe('InMemoryStorageAdapter', () => {
                 sub: 'minimal-user',
             };
 
-            await adapter.storeUser(minimalUser);
+            await adapter.storeUser(minimalUser, minimalUser, {});
 
             const retrievedUser = await adapter.findUser(
                 createJwtTokenContext('minimal-user'),
@@ -71,7 +71,7 @@ describe('InMemoryStorageAdapter', () => {
 
     describe('findUser', () => {
         it('should return user when found', async () => {
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             const result = await adapter.findUser(
                 createJwtTokenContext('user123'),
@@ -92,7 +92,7 @@ describe('InMemoryStorageAdapter', () => {
         });
 
         it('should be case-sensitive for subject matching', async () => {
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             const result = await adapter.findUser(
                 createJwtTokenContext('USER123'),
@@ -104,11 +104,12 @@ describe('InMemoryStorageAdapter', () => {
     describe('clear', () => {
         it('should clear all stored users', async () => {
             // Store multiple users
-            await adapter.storeUser(mockUser);
-            await adapter.storeUser({
+            await adapter.storeUser(mockUser, mockUser, {});
+            const anotherUser = {
                 sub: 'user456',
                 name: 'Another User',
-            });
+            };
+            await adapter.storeUser(anotherUser, anotherUser, {});
 
             // Verify users are stored
             expect(
@@ -132,9 +133,9 @@ describe('InMemoryStorageAdapter', () => {
 
         it('should not affect subsequent store operations', async () => {
             // Store, clear, then store again
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
             adapter.clear();
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             const result = await adapter.findUser(
                 createJwtTokenContext('user123'),
@@ -158,8 +159,8 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             // Store both users
-            await adapter.storeUser(user1);
-            await adapter.storeUser(user2);
+            await adapter.storeUser(user1, user1, {});
+            await adapter.storeUser(user2, user2, {});
 
             // Retrieve both users
             const retrievedUser1 = await adapter.findUser(
@@ -174,7 +175,7 @@ describe('InMemoryStorageAdapter', () => {
 
             // Update one user shouldn't affect the other
             const updatedUser1 = { ...user1, name: 'Updated First User' };
-            await adapter.storeUser(updatedUser1);
+            await adapter.storeUser(updatedUser1, updatedUser1, {});
 
             expect(
                 await adapter.findUser(createJwtTokenContext('user1')),
@@ -207,7 +208,7 @@ describe('InMemoryStorageAdapter', () => {
                 lastIntrospection: 1640995200000,
             };
 
-            await adapter.storeUser(complexUser);
+            await adapter.storeUser(complexUser, complexUser, {});
             const retrieved = await adapter.findUser(
                 createJwtTokenContext('complex-user'),
             );
@@ -224,7 +225,7 @@ describe('InMemoryStorageAdapter', () => {
                 lastIntrospection: Date.now(),
             };
 
-            await adapter.storeUser(userWithUndefined);
+            await adapter.storeUser(userWithUndefined, userWithUndefined, {});
             const retrieved = await adapter.findUser(
                 createJwtTokenContext('user-with-undefined'),
             );
@@ -253,8 +254,8 @@ describe('InMemoryStorageAdapter', () => {
                 email: 'second@example.com',
             };
 
-            await adapter.storeUser(user1);
-            await adapter.storeUser(user2);
+            await adapter.storeUser(user1, user1, {});
+            await adapter.storeUser(user2, user2, {});
 
             const users = adapter.getAllUsers();
             expect(users).toHaveLength(2);
@@ -263,10 +264,10 @@ describe('InMemoryStorageAdapter', () => {
         });
 
         it('should return updated user data', async () => {
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
 
             const updatedUser = { ...mockUser, name: 'Updated Name' };
-            await adapter.storeUser(updatedUser);
+            await adapter.storeUser(updatedUser, updatedUser, {});
 
             const users = adapter.getAllUsers();
             expect(users).toHaveLength(1);
@@ -275,11 +276,87 @@ describe('InMemoryStorageAdapter', () => {
         });
 
         it('should return empty array after clear', async () => {
-            await adapter.storeUser(mockUser);
+            await adapter.storeUser(mockUser, mockUser, {});
             expect(adapter.getAllUsers()).toHaveLength(1);
 
             adapter.clear();
             expect(adapter.getAllUsers()).toEqual([]);
+        });
+    });
+
+    describe('metadata separation', () => {
+        it('should handle metadata parameter separately from user claims', async () => {
+            const userClaims = {
+                sub: 'test-metadata-user',
+                name: 'Test User',
+                email: 'test@example.com',
+            };
+
+            const metadata = {
+                lastUserInfoRefresh: Date.now(),
+                lastIntrospection: Date.now() - 5000,
+            };
+
+            // Store user with separated metadata
+            await adapter.storeUser(null, userClaims, metadata);
+
+            const retrievedUser = await adapter.findUser(
+                createJwtTokenContext('test-metadata-user'),
+            );
+
+            expect(retrievedUser).toBeDefined();
+            expect(retrievedUser?.sub).toBe('test-metadata-user');
+            expect(retrievedUser?.['name']).toBe('Test User');
+            expect(retrievedUser?.['email']).toBe('test@example.com');
+            expect(retrievedUser?.lastUserInfoRefresh).toBe(
+                metadata.lastUserInfoRefresh,
+            );
+            expect(retrievedUser?.lastIntrospection).toBe(
+                metadata.lastIntrospection,
+            );
+        });
+
+        it('should merge metadata with existing user data', async () => {
+            const existingUser: UserRecord = {
+                sub: 'existing-user',
+                name: 'Existing User',
+                email: 'existing@example.com',
+                role: 'user',
+                lastUserInfoRefresh: Date.now() - 10000,
+            };
+
+            await adapter.storeUser(existingUser, existingUser, {});
+
+            const newClaims = {
+                sub: 'existing-user',
+                name: 'Updated User',
+                email: 'updated@example.com',
+                department: 'Engineering',
+            };
+
+            const newMetadata = {
+                lastUserInfoRefresh: Date.now(),
+                lastIntrospection: Date.now() - 1000,
+            };
+
+            // Update user with new claims and metadata
+            await adapter.storeUser(existingUser, newClaims, newMetadata);
+
+            const updatedUser = await adapter.findUser(
+                createJwtTokenContext('existing-user'),
+            );
+
+            expect(updatedUser).toBeDefined();
+            expect(updatedUser?.['name']).toBe('Updated User');
+            expect(updatedUser?.['email']).toBe('updated@example.com');
+            expect(updatedUser?.['department']).toBe('Engineering');
+            expect(updatedUser?.['role']).toBe('user'); // Should preserve existing data
+            expect(updatedUser?.lastUserInfoRefresh).toBe(
+                newMetadata.lastUserInfoRefresh,
+            );
+            expect(updatedUser?.lastIntrospection).toBe(
+                newMetadata.lastIntrospection,
+            );
         });
     });
 });

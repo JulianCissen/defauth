@@ -50,14 +50,19 @@ export interface UserClaims {
 }
 
 /**
- * Internal user record stored in the adapter
+ * Metadata claims for internal storage management
  */
-export interface UserRecord extends UserClaims {
+export interface StorageMetadata {
     /** Timestamp of last user info refresh (in milliseconds) */
     lastUserInfoRefresh?: number;
     /** Timestamp of last introspection (in milliseconds) */
     lastIntrospection?: number;
 }
+
+/**
+ * Internal user record stored in the adapter
+ */
+export type UserRecord = UserClaims & StorageMetadata;
 
 /**
  * Zod schema for user record validation
@@ -95,7 +100,7 @@ export type UserInfoRefreshCondition = (user: UserRecord) => boolean;
 /**
  * Configuration options for the authenticator
  */
-export interface AuthenticatorConfig {
+export interface AuthenticatorConfig<TUser extends UserRecord = UserRecord> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */
@@ -103,7 +108,7 @@ export interface AuthenticatorConfig {
     /** Client secret (optional for public clients) */
     clientSecret?: string;
     /** Storage adapter (defaults to in-memory) */
-    storageAdapter?: StorageAdapter;
+    storageAdapter?: StorageAdapter<TUser>;
     /**
      * Function to determine when to refresh user info (defaults to 1 hour check)
      * This determines when the UserInfo endpoint should be called
@@ -156,20 +161,26 @@ export type TokenContext =
 /**
  * Storage adapter interface for persisting user data
  */
-export interface StorageAdapter {
+export interface StorageAdapter<TUser extends UserRecord = UserRecord> {
     /**
      * Find a user by their token context
      * @param context - The token validation context with full token information
      * @returns Promise resolving to user record or null if not found
      */
-    findUser(context: TokenContext): Promise<UserRecord | null>;
+    findUser(context: TokenContext): Promise<TUser | null>;
 
     /**
      * Store or update user data
-     * @param user - The user record to store
+     * @param user - The user record to store (null for new users)
+     * @param newClaims - The new claims to merge with the user record
+     * @param metadata - Storage metadata (timestamps, etc.)
      * @returns Promise resolving when storage is complete
      */
-    storeUser(user: UserRecord): Promise<void>;
+    storeUser(
+        user: TUser | null,
+        newClaims: UserClaims,
+        metadata: StorageMetadata,
+    ): Promise<TUser>;
 }
 
 /**
