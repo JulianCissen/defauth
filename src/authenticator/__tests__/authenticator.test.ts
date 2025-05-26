@@ -1078,11 +1078,13 @@ describe('Authenticator', () => {
 
                 // First call should trigger UserInfo fetch
                 await authenticator.getUser(MOCK_JWT_TOKEN);
-                const firstCallCount = openidMock.fetchUserInfo.mock.calls.length;
+                const firstCallCount =
+                    openidMock.fetchUserInfo.mock.calls.length;
 
                 // Second call should use cached data
                 await authenticator.getUser(MOCK_JWT_TOKEN);
-                const secondCallCount = openidMock.fetchUserInfo.mock.calls.length;
+                const secondCallCount =
+                    openidMock.fetchUserInfo.mock.calls.length;
 
                 expect(firstCallCount).toBe(1);
                 expect(secondCallCount).toBe(1); // Should not increase
