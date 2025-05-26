@@ -2,6 +2,7 @@
 applyTo: '**/*.{ts}'
 ---
 - Don't fix linting errors. I will fix them myself.
+- Write function expressions with arrow syntax. Avoid using function declarations, unless needed to overload a function.
 - Keep function size in mind. Functions should be small and focused. If you're editing a function, consider if it can be split into smaller functions.
 - Keep component size in mind. Components should be small and focused. If you're editing a component, consider splitting it up if it has multiple responsibilities or grows too large.
 - Don't add unnecessary comments. If the code is self-explanatory, no comment is needed.
