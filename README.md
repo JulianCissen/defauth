@@ -282,19 +282,66 @@ The library exports Zod schemas for validation:
 
 ## Error Handling
 
-The library throws descriptive errors for various scenarios:
+The library provides structured error handling with custom error classes for different scenarios:
+
+### Error Types
+
+DefAuth exports the following custom error classes:
+
+- **`DefAuthError`**: Base error class for all DefAuth errors
+- **`InitializationError`**: Thrown when OIDC client initialization fails
+- **`TokenValidationError`**: Thrown when token validation fails
+- **`JwtVerificationError`**: Thrown when JWT signature verification fails (extends TokenValidationError)
+- **`UserInfoError`**: Thrown when UserInfo endpoint fails (when `throwOnUserInfoFailure: true`)
+- **`IntrospectionError`**: Thrown when token introspection fails
+
+### Usage Examples
+
+```typescript
+import { 
+  Authenticator, 
+  InitializationError, 
+  TokenValidationError, 
+  JwtVerificationError,
+  UserInfoError,
+  IntrospectionError 
+} from 'defauth';
+
+try {
+  const user = await auth.getUser(token);
+} catch (error) {
+  if (error instanceof InitializationError) {
+    // Handle OIDC client initialization failure
+    console.error('Failed to initialize OIDC client:', error.message);
+  } else if (error instanceof JwtVerificationError) {
+    // Handle JWT signature verification failure
+    console.error('JWT signature verification failed:', error.message);
+  } else if (error instanceof UserInfoError) {
+    // Handle UserInfo endpoint failure
+    console.error('UserInfo fetch failed:', error.message);
+  } else if (error instanceof IntrospectionError) {
+    // Handle introspection failure
+    console.error('Token introspection failed:', error.message);
+  } else if (error instanceof TokenValidationError) {
+    // Handle general token validation failure
+    console.error('Token validation failed:', error.message);
+  } else {
+    // Handle other errors
+    console.error('Unexpected error:', error.message);
+  }
+}
+```
+
+### Error Context
+
+All custom errors preserve the original error as the `cause` property and include it in the error message for better debugging:
 
 ```typescript
 try {
   const user = await auth.getUser(token);
 } catch (error) {
-  if (error.message.includes('Token is not active')) {
-    // Handle expired/invalid token
-  } else if (error.message.includes('JWT token is missing sub claim')) {
-    // Handle malformed JWT
-  } else {
-    // Handle other errors
-  }
+  console.error('Error:', error.message); // Includes cause message
+  console.error('Original cause:', error.cause); // Access original error
 }
 ```
 

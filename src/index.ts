@@ -14,6 +14,16 @@ export type {
     LogLevel,
 } from './types/index.js';
 
+// Error exports
+export {
+    DefAuthError,
+    InitializationError,
+    TokenValidationError,
+    UserInfoError,
+    IntrospectionError,
+    JwtVerificationError,
+} from './types/index.js';
+
 // Storage adapter exports
 export { InMemoryStorageAdapter } from './storage/index.js';
 

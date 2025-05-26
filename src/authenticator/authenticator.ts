@@ -15,7 +15,16 @@ import {
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
-import { TokenType, UserClaimsSchema } from '../types/index.js';
+import {
+    DefAuthError,
+    InitializationError,
+    IntrospectionError,
+    JwtVerificationError,
+    TokenType,
+    TokenValidationError,
+    UserClaimsSchema,
+    UserInfoError,
+} from '../types/index.js';
 import { InMemoryStorageAdapter } from '../storage/index.js';
 import type { IntrospectionResponse } from 'oauth4webapi';
 
@@ -66,8 +75,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
         };
 
         this.initializeClient(config).catch((error) => {
-            this.initializationError = new Error(
-                `Failed to initialize OIDC client: ${error.message}`,
+            this.initializationError = new InitializationError(
+                'Failed to initialize OIDC client',
+                error as Error,
             );
             this.logger.log('error', 'OIDC client initialization failed', {
                 error: error.message,
@@ -125,8 +135,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
             );
             this.isInitialized = true;
         } catch (error) {
-            throw new Error(
-                `Failed to discover OIDC issuer or create client: ${(error as Error).message}`,
+            throw new InitializationError(
+                'Failed to discover OIDC issuer or create client',
+                error as Error,
             );
         }
     }
@@ -214,8 +225,13 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
                 forceIntrospection: options?.forceIntrospection,
             });
         } catch (error) {
-            throw new Error(
-                `Failed to process JWT token: ${(error as Error).message}`,
+            // If it's already a DefAuth error, re-throw it to preserve the specific error type
+            if (error instanceof DefAuthError) {
+                throw error;
+            }
+            throw new TokenValidationError(
+                'Failed to process JWT token',
+                error as Error,
             );
         }
     }
@@ -301,8 +317,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
 
             return await jose.jwtVerify(token, jwks, jwtVerifyOptions);
         } catch (error) {
-            throw new Error(
-                `JWT signature verification failed: ${(error as Error).message}`,
+            throw new JwtVerificationError(
+                'JWT signature verification failed',
+                error as Error,
             );
         }
     }
@@ -335,11 +352,11 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     /**
      * Validate introspection result
      * @param result - The introspection response
-     * @throws Error if token is not active
+     * @throws TokenValidationError if token is not active
      */
     private validateIntrospectionResult(result: IntrospectionResponse): void {
         if (!result.active) {
-            throw new Error('Token is not active');
+            throw new TokenValidationError('Token is not active');
         }
     }
 
@@ -353,13 +370,13 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
         error: Error,
         context?: Record<string, unknown>,
     ): void {
-        const message = `Failed to fetch UserInfo: ${error.message}`;
+        const message = 'Failed to fetch UserInfo';
 
         if (this.throwOnUserInfoFailure) {
-            throw new Error(message);
+            throw new UserInfoError(message, error);
         }
 
-        this.logger.log('warn', message, context);
+        this.logger.log('warn', `${message}: ${error.message}`, context);
     }
 
     /**
@@ -407,8 +424,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
                 token,
             )) as IntrospectionResponse;
         } catch (error) {
-            throw new Error(
-                `Failed to introspect token: ${(error as Error).message}`,
+            throw new IntrospectionError(
+                'Failed to introspect token',
+                error as Error,
             );
         }
     }
@@ -459,8 +477,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
 
             return this.extractUserClaims(userInfoResponse);
         } catch (error) {
-            throw new Error(
-                `Failed to fetch user info: ${(error as Error).message}`,
+            throw new UserInfoError(
+                'Failed to fetch user info',
+                error as Error,
             );
         }
     }
@@ -533,7 +552,9 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     ): UserClaims {
         const sub = (payload['sub'] as string) || '';
         if (!sub) {
-            throw new Error('Payload missing required "sub" claim');
+            throw new TokenValidationError(
+                'Payload missing required "sub" claim',
+            );
         }
 
         const userClaims: UserClaims = { sub };

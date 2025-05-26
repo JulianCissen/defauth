@@ -1,4 +1,14 @@
-import { Authenticator, InMemoryStorageAdapter, ConsoleLogger } from '../src/index.js';
+import { 
+    Authenticator, 
+    InMemoryStorageAdapter, 
+    ConsoleLogger,
+    // Error classes for structured error handling
+    InitializationError,
+    TokenValidationError,
+    JwtVerificationError,
+    UserInfoError,
+    IntrospectionError,
+} from '../src/index.js';
 import type { Logger, LogLevel } from '../src/index.js';
 
 // Example usage of the DefAuth library
@@ -107,7 +117,33 @@ async function example() {
             name: userFromOpaque.name,
         });
     } catch (error) {
-        console.error('Authentication failed:', error.message);
+        // Example of structured error handling with custom error classes
+        // Import these from '../src/index.js': InitializationError, TokenValidationError, 
+        // JwtVerificationError, UserInfoError, IntrospectionError
+        
+        if (error.constructor.name === 'InitializationError') {
+            console.error('OIDC client initialization failed:', error.message);
+            console.error('Original cause:', error.cause?.message);
+        } else if (error.constructor.name === 'JwtVerificationError') {
+            console.error('JWT signature verification failed:', error.message);
+            // This might indicate token tampering or expired keys
+        } else if (error.constructor.name === 'UserInfoError') {
+            console.error('UserInfo endpoint failed:', error.message);
+            // User profile data might be incomplete
+        } else if (error.constructor.name === 'IntrospectionError') {
+            console.error('Token introspection failed:', error.message);
+            // Authorization server might be down
+        } else if (error.constructor.name === 'TokenValidationError') {
+            console.error('Token validation failed:', error.message);
+            // General token validation error
+        } else {
+            // Legacy error message checking for backward compatibility
+            if (error.message?.includes('Token is not active')) {
+                console.error('Token expired or invalid');
+            } else {
+                console.error('Unexpected authentication error:', error.message);
+            }
+        }
     }
 }
 

@@ -1,6 +1,16 @@
 import type { IntrospectionResponse } from 'oauth4webapi';
 import { z } from 'zod';
 
+// Re-export error classes
+export {
+    DefAuthError,
+    InitializationError,
+    TokenValidationError,
+    UserInfoError,
+    IntrospectionError,
+    JwtVerificationError,
+} from '../errors/index.js';
+
 /**
  * Log levels for the logger interface
  */
