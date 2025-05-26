@@ -2,6 +2,7 @@ import * as jose from 'jose';
 import * as openid from 'openid-client';
 import type {
     AuthenticatorConfig,
+    JwtValidationOptions,
     Logger,
     StorageAdapter,
     TokenContext,
@@ -27,8 +28,26 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     private userInfoRefreshCondition: UserInfoRefreshCondition;
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
+    private globalJwtValidationOptions: JwtValidationOptions;
     private isInitialized = false;
     private initializationError?: Error;
+
+    private static readonly JWT_METADATA_CLAIMS = [
+        'client_id',
+        'scope',
+        'token_type',
+        'nbf',
+        'jti',
+    ] as const;
+
+    private static readonly INTROSPECTION_METADATA_CLAIMS = [
+        'active',
+        'client_id',
+        'scope',
+        'token_type',
+        'nbf',
+        'jti',
+    ] as const;
 
     /**
      * Creates an instance of the Authenticator
@@ -41,6 +60,10 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
             config.userInfoRefreshCondition || defaultUserInfoRefreshCondition;
         this.logger = config.logger || new ConsoleLogger();
         this.throwOnUserInfoFailure = config.throwOnUserInfoFailure || false;
+        this.globalJwtValidationOptions = config.jwtValidationOptions || {
+            requiredClaims: ['sub', 'exp'],
+            clockTolerance: '1 minute',
+        };
 
         this.initializeClient(config).catch((error) => {
             this.initializationError = new Error(
@@ -57,12 +80,14 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
      * @param token - The token (JWT or opaque)
      * @param options - Optional settings for token processing
      * @param options.forceIntrospection - Force token introspection even for valid JWTs
+     * @param options.clockTolerance - Clock tolerance for JWT expiration validation
+     * @param options.requiredClaims - Required claims that must be present in the JWT
      * @returns Promise resolving to user claims
      * @throws Error if token is invalid or user cannot be retrieved
      */
     async getUser(
         token: string,
-        options?: { forceIntrospection?: boolean },
+        options?: JwtValidationOptions,
     ): Promise<TUser> {
         this.validateToken(token);
         this.ensureInitialized();
@@ -73,7 +98,7 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
             return this.handleOpaqueToken(token);
         }
 
-        return this.handleJwtToken(token, options?.forceIntrospection);
+        return this.handleJwtToken(token, options);
     }
 
     /**
@@ -153,7 +178,7 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
 
         const userRecord = await this.storageAdapter.findUser(tokenContext);
 
-        return this.processUserClaims(token, userClaims, {
+        return await this.processUserClaims(token, userClaims, {
             tokenType: 'opaque',
             userRecord,
             lastIntrospection: Date.now(),
@@ -163,50 +188,30 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     /**
      * Handle JWT token with signature verification and conditional introspection
      * @param token - The JWT token
-     * @param forceIntrospection - Whether to force token introspection regardless of conditions
+     * @param options - JWT validation options
      * @returns Promise resolving to user claims
      */
     private async handleJwtToken(
         token: string,
-        forceIntrospection?: boolean,
+        options?: JwtValidationOptions,
     ): Promise<TUser> {
         try {
             const validationResult = await this.getValidatedJwtPayload(
                 token,
-                forceIntrospection,
+                options,
             );
             const userClaims = this.createUserClaimsFromPayload(
                 validationResult.payload,
             );
 
-            const tokenContext: TokenContext =
-                validationResult.type === 'jwt'
-                    ? {
-                          sub: validationResult.payload.sub,
-                          type: 'jwt',
-                          jwtPayload: validationResult.payload,
-                          metadata: {
-                              validatedAt: Date.now(),
-                          },
-                      }
-                    : {
-                          sub: validationResult.payload.sub,
-                          type: 'introspection',
-                          introspectionResponse:
-                              validationResult.introspectionResponse,
-                          metadata: {
-                              forcedIntrospection: true,
-                              validatedAt: Date.now(),
-                          },
-                      };
-
+            const tokenContext = this.createTokenContext(validationResult);
             const userRecord = await this.storageAdapter.findUser(tokenContext);
 
-            return this.processUserClaims(token, userClaims, {
+            return await this.processUserClaims(token, userClaims, {
                 tokenType: 'jwt',
                 userRecord,
                 lastIntrospection: userRecord?.lastIntrospection,
-                forceIntrospection,
+                forceIntrospection: options?.forceIntrospection,
             });
         } catch (error) {
             throw new Error(
@@ -218,12 +223,12 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     /**
      * Get validated JWT payload, either through signature verification or introspection
      * @param token - The JWT token
-     * @param forceIntrospection - Whether to use introspection instead of signature verification
+     * @param options - JWT validation options
      * @returns Promise resolving to validation result with payload and optional introspection response
      */
     private async getValidatedJwtPayload(
         token: string,
-        forceIntrospection?: boolean,
+        options?: JwtValidationOptions,
     ): Promise<
         | { type: 'jwt'; payload: UserClaims }
         | {
@@ -232,32 +237,48 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
               introspectionResponse: IntrospectionResponse;
           }
     > {
-        if (forceIntrospection) {
-            const introspectionResult = await this.introspectToken(token);
-            this.validateIntrospectionResult(introspectionResult);
-            const payload =
-                this.introspectionResponseToUserClaims(introspectionResult);
-            return {
-                type: 'introspection',
-                payload,
-                introspectionResponse: introspectionResult,
-            };
+        const mergedOptions = this.mergeJwtValidationOptions(options);
+
+        if (!mergedOptions.forceIntrospection) {
+            try {
+                const { payload: verifiedPayload } =
+                    await this.verifyJwtSignature(token, mergedOptions);
+                const payload = UserClaimsSchema.parse(verifiedPayload);
+                return { type: 'jwt', payload };
+            } catch (error) {
+                this.logger.log(
+                    'warn',
+                    'JWT verification failed, falling back to introspection',
+                    {
+                        error: (error as Error).message,
+                    },
+                );
+                // Fall through to introspection
+            }
         }
 
-        const { payload: verifiedPayload } =
-            await this.verifyJwtSignature(token);
-        const payload = UserClaimsSchema.parse(verifiedPayload);
-        return { type: 'jwt', payload };
+        const introspectionResult = await this.introspectToken(token);
+        this.validateIntrospectionResult(introspectionResult);
+        const payload =
+            this.introspectionResponseToUserClaims(introspectionResult);
+
+        return {
+            type: 'introspection',
+            payload,
+            introspectionResponse: introspectionResult,
+        };
     }
 
     /**
      * Verify the signature of a JWT token
      * @param token - The JWT token to verify
+     * @param options - JWT validation options
      * @returns Promise resolving to the verified JWT payload
      * @throws Error if the token signature is invalid
      */
     private async verifyJwtSignature(
         token: string,
+        options?: JwtValidationOptions,
     ): Promise<jose.JWTVerifyResult> {
         if (!this.clientConfig) {
             throw new Error('OIDC client configuration is not initialized');
@@ -272,7 +293,13 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
             }
 
             const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
-            return await jose.jwtVerify(token, jwks);
+
+            const jwtVerifyOptions: jose.JWTVerifyOptions = {
+                clockTolerance: options?.clockTolerance,
+                requiredClaims: options?.requiredClaims,
+            };
+
+            return await jose.jwtVerify(token, jwks, jwtVerifyOptions);
         } catch (error) {
             throw new Error(
                 `JWT signature verification failed: ${(error as Error).message}`,
@@ -286,15 +313,10 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
      * @returns User claims object
      */
     private createUserClaimsFromPayload(payload: UserClaims): UserClaims {
-        const tokenMetadataClaims = [
-            'client_id',
-            'scope',
-            'token_type',
-            'nbf',
-            'jti',
-        ];
-
-        return this.extractUserClaims(payload, tokenMetadataClaims);
+        return this.extractUserClaims(
+            payload,
+            Authenticator.JWT_METADATA_CLAIMS,
+        );
     }
 
     /**
@@ -399,16 +421,10 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
     private introspectionResponseToUserClaims(
         response: IntrospectionResponse,
     ): UserClaims {
-        const tokenMetadataClaims = [
-            'active',
-            'client_id',
-            'scope',
-            'token_type',
-            'nbf',
-            'jti',
-        ];
-
-        return this.extractUserClaims(response, tokenMetadataClaims);
+        return this.extractUserClaims(
+            response,
+            Authenticator.INTROSPECTION_METADATA_CLAIMS,
+        );
     }
 
     /**
@@ -513,7 +529,7 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
      */
     private extractUserClaims(
         payload: Record<string, unknown>,
-        metadataClaims: string[] = [],
+        metadataClaims: string[] | Readonly<string[]> = [],
     ): UserClaims {
         const sub = (payload['sub'] as string) || '';
         if (!sub) {
@@ -533,5 +549,53 @@ export class Authenticator<TUser extends UserRecord = UserRecord> {
         }
 
         return userClaims;
+    }
+
+    /**
+     * Merge JWT validation options with global defaults
+     * @param options - Options provided to getUser call
+     * @returns Merged options with global defaults
+     */
+    private mergeJwtValidationOptions(
+        options?: JwtValidationOptions,
+    ): JwtValidationOptions {
+        return {
+            ...this.globalJwtValidationOptions,
+            ...options,
+        };
+    }
+
+    /**
+     * Create token context from validation result
+     * @param validationResult - Result from JWT validation
+     * @returns Token context for storage
+     */
+    private createTokenContext(
+        validationResult: Awaited<
+            ReturnType<typeof this.getValidatedJwtPayload>
+        >,
+    ): TokenContext {
+        const baseContext = {
+            sub: validationResult.payload.sub,
+            metadata: { validatedAt: Date.now() },
+        };
+
+        if (validationResult.type === 'jwt') {
+            return {
+                ...baseContext,
+                type: 'jwt',
+                jwtPayload: validationResult.payload,
+            };
+        }
+
+        return {
+            ...baseContext,
+            type: 'introspection',
+            introspectionResponse: validationResult.introspectionResponse,
+            metadata: {
+                ...baseContext.metadata,
+                forcedIntrospection: true,
+            },
+        };
     }
 }

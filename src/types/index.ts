@@ -98,6 +98,18 @@ export const IntrospectionResponseSchema = z
 export type UserInfoRefreshCondition = (user: UserRecord) => boolean;
 
 /**
+ * JWT validation options
+ */
+export interface JwtValidationOptions {
+    /** Force token introspection even for valid JWTs */
+    forceIntrospection?: boolean;
+    /** Clock tolerance for token expiration validation (default: '1 minute') */
+    clockTolerance?: string;
+    /** Required claims that must be present in the JWT (default: ['sub', 'exp']) */
+    requiredClaims?: string[];
+}
+
+/**
  * Configuration options for the authenticator
  */
 export interface AuthenticatorConfig<TUser extends UserRecord = UserRecord> {
@@ -123,6 +135,10 @@ export interface AuthenticatorConfig<TUser extends UserRecord = UserRecord> {
      * When false, UserInfo failures are logged and the method continues with available data
      */
     throwOnUserInfoFailure?: boolean;
+    /**
+     * Global JWT validation options (can be overridden per getUser call)
+     */
+    jwtValidationOptions?: JwtValidationOptions;
 }
 
 /**
