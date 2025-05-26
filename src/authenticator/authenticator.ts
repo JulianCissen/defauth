@@ -5,10 +5,10 @@ import type {
     JwtValidationOptions,
     Logger,
     StorageAdapter,
+    StorageMetadata,
     TokenContext,
     UserClaims,
     UserInfoRefreshCondition,
-    UserRecord,
 } from '../types/index.js';
 import {
     ConsoleLogger,
@@ -31,10 +31,10 @@ import type { IntrospectionResponse } from 'oauth4webapi';
 /**
  * Main authenticator class that handles OIDC authentication and user management
  */
-export class Authenticator<TUser extends UserRecord = UserRecord> {
+export class Authenticator<TUser extends StorageMetadata> {
     private clientConfig?: openid.Configuration;
     private storageAdapter: StorageAdapter<TUser>;
-    private userInfoRefreshCondition: UserInfoRefreshCondition;
+    private userInfoRefreshCondition: UserInfoRefreshCondition<TUser>;
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
     private globalJwtValidationOptions: JwtValidationOptions;

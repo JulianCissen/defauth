@@ -105,7 +105,9 @@ export const IntrospectionResponseSchema = z
  * Function type for determining when to refresh user info
  * This determines when user info should be refreshed from the OIDC provider
  */
-export type UserInfoRefreshCondition = (user: UserRecord) => boolean;
+export type UserInfoRefreshCondition<
+    TUser extends StorageMetadata = StorageMetadata,
+> = (user: TUser) => boolean;
 
 /**
  * JWT validation options
@@ -122,7 +124,7 @@ export interface JwtValidationOptions {
 /**
  * Configuration options for the authenticator
  */
-export interface AuthenticatorConfig<TUser extends UserRecord = UserRecord> {
+export interface AuthenticatorConfig<TUser extends StorageMetadata> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */
@@ -135,7 +137,7 @@ export interface AuthenticatorConfig<TUser extends UserRecord = UserRecord> {
      * Function to determine when to refresh user info (defaults to 1 hour check)
      * This determines when the UserInfo endpoint should be called
      */
-    userInfoRefreshCondition?: UserInfoRefreshCondition;
+    userInfoRefreshCondition?: UserInfoRefreshCondition<TUser>;
     /**
      * Logger implementation for custom logging (defaults to console-based logger)
      */
@@ -187,7 +189,7 @@ export type TokenContext =
 /**
  * Storage adapter interface for persisting user data
  */
-export interface StorageAdapter<TUser extends UserRecord = UserRecord> {
+export interface StorageAdapter<TUser extends StorageMetadata> {
     /**
      * Find a user by their token context
      * @param context - The token validation context with full token information

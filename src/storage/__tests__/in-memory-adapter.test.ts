@@ -10,7 +10,7 @@ const createJwtTokenContext = (sub: string): TokenContext => ({
 });
 
 describe('InMemoryStorageAdapter', () => {
-    let adapter: InMemoryStorageAdapter;
+    let adapter: InMemoryStorageAdapter<UserRecord>;
     let mockUser: UserRecord;
 
     beforeEach(() => {

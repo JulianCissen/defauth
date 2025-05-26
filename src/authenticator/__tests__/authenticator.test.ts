@@ -1,3 +1,4 @@
+import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -6,8 +7,6 @@ import {
     it,
     jest,
 } from '@jest/globals';
-
-import type { AuthenticatorConfig } from '../../types/index.js';
 
 // Mock external dependencies using ESM mocking
 jest.unstable_mockModule('jose', () => ({
@@ -24,6 +23,9 @@ jest.unstable_mockModule('openid-client', () => ({
 // Import modules after mocking
 const { Authenticator } = await import('../authenticator.js');
 const { InMemoryStorageAdapter } = await import('../../storage/index.js');
+
+// Type alias for the authenticated Authenticator with UserRecord
+type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_INTROSPECTION_INACTIVE,
@@ -47,7 +49,7 @@ const openidMock = jest.mocked(await import('openid-client'));
 describe('Authenticator', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig;
+    let mockConfig: AuthenticatorConfig<UserRecord>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -122,7 +124,7 @@ describe('Authenticator', () => {
     });
 
     describe('Token Validation', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -159,7 +161,7 @@ describe('Authenticator', () => {
     });
 
     describe('JWT Token Handling', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -236,7 +238,7 @@ describe('Authenticator', () => {
     });
 
     describe('Opaque Token Handling', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -274,7 +276,7 @@ describe('Authenticator', () => {
     });
 
     describe('UserInfo Integration', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -329,7 +331,7 @@ describe('Authenticator', () => {
     });
 
     describe('Storage Integration', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -407,7 +409,7 @@ describe('Authenticator', () => {
     });
 
     describe('Edge Cases', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -469,7 +471,7 @@ describe('Authenticator', () => {
     });
 
     describe('Error Handling', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -972,7 +974,7 @@ describe('Authenticator', () => {
     });
 
     describe('API Call Limiting', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -1228,7 +1230,7 @@ describe('Authenticator', () => {
     });
 
     describe('JWT Validation Options', () => {
-        let authenticator: InstanceType<typeof Authenticator>;
+        let authenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             // Create authenticator with custom global JWT validation options
@@ -1416,7 +1418,7 @@ describe('Authenticator', () => {
     });
 
     describe('Default JWT Validation Options', () => {
-        let defaultAuthenticator: InstanceType<typeof Authenticator>;
+        let defaultAuthenticator: UserRecordAuthenticator;
 
         beforeEach(async () => {
             // Create authenticator without custom JWT validation options

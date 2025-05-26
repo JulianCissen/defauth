@@ -3,14 +3,13 @@ import type {
     StorageMetadata,
     TokenContext,
     UserClaims,
-    UserRecord,
 } from '../types/index.js';
 
 /**
  * In-memory storage adapter implementation
  * This is the default storage adapter that keeps user data in memory
  */
-export class InMemoryStorageAdapter<TUser extends UserRecord = UserRecord>
+export class InMemoryStorageAdapter<TUser extends StorageMetadata>
     implements StorageAdapter<TUser>
 {
     private users: Map<string, TUser> = new Map();
@@ -37,11 +36,13 @@ export class InMemoryStorageAdapter<TUser extends UserRecord = UserRecord>
         metadata: StorageMetadata,
     ): Promise<TUser> {
         // Create user record from claims if user is null, otherwise merge with existing
-        const updatedUser = { ...user, ...newClaims, ...metadata } as TUser;
+        const result =
+            user || ({ ...newClaims, ...metadata } as unknown as TUser);
+        Object.assign(result, newClaims, metadata);
 
-        this.users.set(updatedUser.sub, updatedUser);
+        this.users.set(newClaims.sub, result);
 
-        return Promise.resolve(updatedUser);
+        return Promise.resolve(result);
     }
 
     /**

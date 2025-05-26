@@ -101,7 +101,7 @@ export const MOCK_USERINFO_RESPONSE = {
 /**
  * Mock storage adapter that tracks method calls
  */
-export class MockStorageAdapter implements StorageAdapter {
+export class MockStorageAdapter implements StorageAdapter<UserRecord> {
     private storage = new Map<string, UserRecord>();
     public findUserCalls: TokenContext[] = [];
     public storeUserCalls: UserRecord[] = [];
@@ -176,9 +176,9 @@ export class MockLogger implements Logger {
  * @param overrides - Partial configuration to override defaults
  * @returns Mock authenticator configuration
  */
-export const createMockConfig = (
-    overrides: Partial<AuthenticatorConfig> = {},
-): AuthenticatorConfig => ({
+export const createMockConfig = <TUser extends StorageMetadata = UserRecord>(
+    overrides: Partial<AuthenticatorConfig<TUser>> = {},
+): AuthenticatorConfig<TUser> => ({
     issuer: MOCK_ISSUER,
     clientId: MOCK_CLIENT_ID,
     clientSecret: MOCK_CLIENT_SECRET,
