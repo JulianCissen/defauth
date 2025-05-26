@@ -6,7 +6,6 @@ import { defaultUserInfoRefreshCondition } from '../../utils/refresh-conditions.
 
 const createJwtTokenContext = (sub: string): TokenContext => ({
     sub,
-    type: 'jwt',
     jwtPayload: { sub },
     metadata: { validatedAt: Date.now() },
 });

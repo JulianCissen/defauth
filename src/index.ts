@@ -10,6 +10,7 @@ export type {
     StorageMetadata,
     TokenContext,
     UserInfoRefreshCondition,
+    UserInfoStrategy,
     Logger,
     LogLevel,
 } from './types/index.js';

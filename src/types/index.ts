@@ -110,6 +110,11 @@ export type UserInfoRefreshCondition<
 > = (user: TUser) => boolean;
 
 /**
+ * Strategy for when to fetch UserInfo during the authentication process
+ */
+export type UserInfoStrategy = 'afterUserRetrieval' | 'beforeUserRetrieval';
+
+/**
  * JWT validation options
  */
 export interface JwtValidationOptions {
@@ -139,6 +144,12 @@ export interface AuthenticatorConfig<TUser extends StorageMetadata> {
      */
     userInfoRefreshCondition?: UserInfoRefreshCondition<TUser>;
     /**
+     * Strategy for when to fetch UserInfo during authentication (defaults to 'afterUserRetrieval')
+     * - 'afterUserRetrieval': Fetch UserInfo after finding user in storage (original behavior)
+     * - 'beforeUserRetrieval': Fetch UserInfo before storage lookup and include in TokenContext
+     */
+    userInfoStrategy?: UserInfoStrategy;
+    /**
      * Logger implementation for custom logging (defaults to console-based logger)
      */
     logger?: Logger;
@@ -154,37 +165,25 @@ export interface AuthenticatorConfig<TUser extends StorageMetadata> {
 }
 
 /**
- * Context for token validation - discriminated union based on validation type
+ * Context for token validation containing information from validation process
  */
-export type TokenContext =
-    | {
-          /** The subject identifier from the token */
-          sub: string;
-          /** The type of token validation that occurred */
-          type: 'jwt';
-          /** The full validated JWT payload */
-          jwtPayload: UserClaims;
-          /** Additional metadata about the validation process */
-          metadata?: {
-              /** Timestamp when this validation occurred */
-              validatedAt: number;
-          };
-      }
-    | {
-          /** The subject identifier from the token */
-          sub: string;
-          /** The type of token validation that occurred */
-          type: 'introspection';
-          /** The full introspection response */
-          introspectionResponse: IntrospectionResponse;
-          /** Additional metadata about the validation process */
-          metadata?: {
-              /** Whether introspection was forced for a JWT token */
-              forcedIntrospection?: boolean;
-              /** Timestamp when this validation occurred */
-              validatedAt: number;
-          };
-      };
+export interface TokenContext {
+    /** The subject identifier from the token */
+    sub: string;
+    /** The full validated JWT payload (present when token is JWT) */
+    jwtPayload?: UserClaims;
+    /** The full introspection response (present when introspection was performed) */
+    introspectionResponse?: IntrospectionResponse;
+    /** UserInfo result (present when UserInfo was fetched before user retrieval) */
+    userInfoResult?: UserClaims;
+    /** Additional metadata about the validation process */
+    metadata?: {
+        /** Timestamp when this validation occurred */
+        validatedAt?: number;
+        /** Whether introspection was forced for a JWT token */
+        forcedIntrospection?: boolean;
+    };
+}
 
 /**
  * Storage adapter interface for persisting user data

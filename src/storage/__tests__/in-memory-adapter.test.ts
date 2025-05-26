@@ -4,7 +4,6 @@ import { InMemoryStorageAdapter } from '../in-memory-adapter.js';
 
 const createJwtTokenContext = (sub: string): TokenContext => ({
     sub,
-    type: 'jwt',
     jwtPayload: { sub },
     metadata: { validatedAt: Date.now() },
 });

@@ -27,8 +27,11 @@ const { InMemoryStorageAdapter } = await import('../../storage/index.js');
 // Type alias for the authenticated Authenticator with UserRecord
 type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
 const {
+    MOCK_CLIENT_ID,
+    MOCK_CLIENT_SECRET,
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_INTROSPECTION_INACTIVE,
+    MOCK_ISSUER,
     MOCK_JWT_PAYLOAD,
     MOCK_JWT_TOKEN,
     MOCK_OPAQUE_TOKEN,
@@ -747,7 +750,7 @@ describe('Authenticator', () => {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Existing User',
                     email: 'existing@example.com',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000, // Force refresh
+                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
                 };
                 mockStorageAdapter.setUser(existingUser);
 
@@ -1398,12 +1401,10 @@ describe('Authenticator', () => {
             const tokenContext = mockStorageAdapter.findUserCalls[0];
             expect(tokenContext).toBeDefined();
             if (tokenContext) {
-                expect(tokenContext.type).toBe('jwt');
+                expect(tokenContext.jwtPayload).toBeDefined();
                 expect(tokenContext.sub).toBe(MOCK_USER_CLAIMS.sub);
                 expect(tokenContext.metadata?.validatedAt).toBeGreaterThan(0);
-                if (tokenContext.type === 'jwt') {
-                    expect(tokenContext.jwtPayload).toBeDefined();
-                }
+                expect(tokenContext.jwtPayload).toBeDefined();
             }
         });
 
@@ -1416,15 +1417,11 @@ describe('Authenticator', () => {
             const tokenContext = mockStorageAdapter.findUserCalls[0];
             expect(tokenContext).toBeDefined();
             if (tokenContext) {
-                expect(tokenContext.type).toBe('introspection');
+                expect(tokenContext.introspectionResponse).toBeDefined();
                 expect(tokenContext.sub).toBe(MOCK_USER_CLAIMS.sub);
                 expect(tokenContext.metadata?.validatedAt).toBeGreaterThan(0);
-                if (tokenContext.type === 'introspection') {
-                    expect(tokenContext.introspectionResponse).toBeDefined();
-                    expect(tokenContext.metadata?.forcedIntrospection).toBe(
-                        true,
-                    );
-                }
+                expect(tokenContext.introspectionResponse).toBeDefined();
+                expect(tokenContext.metadata?.forcedIntrospection).toBe(true);
             }
         });
 
@@ -1509,6 +1506,247 @@ describe('Authenticator', () => {
                     requiredClaims: ['sub', 'aud', 'iss'],
                 }),
             );
+        });
+    });
+
+    describe('UserInfo Strategy', () => {
+        let authenticator: UserRecordAuthenticator;
+
+        beforeEach(async () => {
+            authenticator = new Authenticator(mockConfig);
+            await waitForAsync();
+        });
+
+        describe('afterUserRetrieval (default strategy)', () => {
+            it('should fetch UserInfo after user retrieval by default', async () => {
+                // Default behavior should be afterUserRetrieval
+                const result = await authenticator.getUser(MOCK_JWT_TOKEN);
+
+                expect(result).toEqual(
+                    expect.objectContaining({
+                        sub: MOCK_USER_CLAIMS.sub,
+                        name: MOCK_USERINFO_RESPONSE.name,
+                        email: MOCK_USERINFO_RESPONSE.email,
+                    }),
+                );
+
+                // Verify storage lookup happened first
+                expect(mockStorageAdapter.findUserCalls).toHaveLength(1);
+
+                // Verify UserInfo was called after storage lookup (in processUserClaims)
+                expect(openidMock.fetchUserInfo).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    MOCK_JWT_TOKEN,
+                    MOCK_USER_CLAIMS.sub,
+                );
+
+                // In afterUserRetrieval strategy, UserInfo is not fetched before storage lookup
+                // so TokenContext doesn't have userInfoResult
+                const tokenContext = mockStorageAdapter.findUserCalls[0];
+                expect(tokenContext?.userInfoResult).toBeUndefined();
+            });
+
+            it('should respect userInfoRefreshCondition in afterUserRetrieval strategy', async () => {
+                const customCondition = jest.fn().mockReturnValue(false);
+                const authenticatorWithCondition = new Authenticator({
+                    issuer: MOCK_ISSUER,
+                    clientId: MOCK_CLIENT_ID,
+                    clientSecret: MOCK_CLIENT_SECRET,
+                    storageAdapter: mockStorageAdapter,
+                    userInfoRefreshCondition: customCondition as any,
+                    userInfoStrategy: 'afterUserRetrieval',
+                });
+
+                // Store a user first
+                await authenticatorWithCondition.getUser(MOCK_JWT_TOKEN);
+                jest.clearAllMocks();
+
+                // Second call should not fetch UserInfo due to condition
+                await authenticatorWithCondition.getUser(MOCK_JWT_TOKEN);
+
+                expect(openidMock.fetchUserInfo).not.toHaveBeenCalled();
+                expect(customCondition).toHaveBeenCalled();
+            });
+        });
+
+        describe('beforeUserRetrieval strategy', () => {
+            let beforeRetrievalAuthenticator: UserRecordAuthenticator;
+
+            beforeEach(() => {
+                beforeRetrievalAuthenticator = new Authenticator({
+                    issuer: MOCK_ISSUER,
+                    clientId: MOCK_CLIENT_ID,
+                    clientSecret: MOCK_CLIENT_SECRET,
+                    storageAdapter: mockStorageAdapter,
+                    userInfoStrategy: 'beforeUserRetrieval',
+                });
+            });
+
+            it('should fetch UserInfo before user retrieval', async () => {
+                const result =
+                    await beforeRetrievalAuthenticator.getUser(MOCK_JWT_TOKEN);
+
+                expect(result).toEqual(
+                    expect.objectContaining({
+                        sub: MOCK_USER_CLAIMS.sub,
+                        name: MOCK_USERINFO_RESPONSE.name,
+                        email: MOCK_USERINFO_RESPONSE.email,
+                    }),
+                );
+
+                // Verify UserInfo was called before storage lookup
+                expect(openidMock.fetchUserInfo).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    MOCK_JWT_TOKEN,
+                    MOCK_USER_CLAIMS.sub,
+                );
+
+                // Verify TokenContext includes userInfoResult
+                expect(mockStorageAdapter.findUserCalls).toHaveLength(1);
+                const tokenContext = mockStorageAdapter.findUserCalls[0];
+                expect(tokenContext?.userInfoResult).toEqual(
+                    MOCK_USERINFO_RESPONSE,
+                );
+            });
+
+            it('should handle UserInfo failure gracefully in beforeUserRetrieval strategy', async () => {
+                openidMock.fetchUserInfo.mockRejectedValueOnce(
+                    new Error('UserInfo failed'),
+                );
+
+                const result =
+                    await beforeRetrievalAuthenticator.getUser(MOCK_JWT_TOKEN);
+
+                // Should still return user with JWT claims
+                expect(result).toEqual(
+                    expect.objectContaining({
+                        sub: MOCK_USER_CLAIMS.sub,
+                    }),
+                );
+
+                // Verify UserInfo failure was handled
+                expect(openidMock.fetchUserInfo).toHaveBeenCalled();
+
+                // Verify TokenContext doesn't have userInfoResult when failed
+                const tokenContext = mockStorageAdapter.findUserCalls[0];
+                expect(tokenContext?.userInfoResult).toBeUndefined();
+            });
+
+            it('should always fetch UserInfo in beforeUserRetrieval strategy (condition ignored)', async () => {
+                const mockCondition = jest.fn().mockReturnValue(false);
+                const conditionalAuthenticator = new Authenticator({
+                    issuer: MOCK_ISSUER,
+                    clientId: MOCK_CLIENT_ID,
+                    clientSecret: MOCK_CLIENT_SECRET,
+                    storageAdapter: mockStorageAdapter,
+                    userInfoStrategy: 'beforeUserRetrieval',
+                    userInfoRefreshCondition: mockCondition as any,
+                });
+
+                await conditionalAuthenticator.getUser(MOCK_JWT_TOKEN);
+
+                // In beforeUserRetrieval strategy, UserInfo is always fetched regardless of condition
+                expect(openidMock.fetchUserInfo).toHaveBeenCalled();
+                // The condition is not checked in beforeUserRetrieval strategy for simplicity
+                expect(mockCondition).not.toHaveBeenCalled();
+
+                // Verify TokenContext DOES have userInfoResult since it was fetched
+                const tokenContext = mockStorageAdapter.findUserCalls[0];
+                expect(tokenContext?.userInfoResult).toEqual(
+                    MOCK_USERINFO_RESPONSE,
+                );
+            });
+
+            it('should work with opaque tokens in beforeUserRetrieval strategy', async () => {
+                const result =
+                    await beforeRetrievalAuthenticator.getUser(
+                        MOCK_OPAQUE_TOKEN,
+                    );
+
+                expect(result).toEqual(
+                    expect.objectContaining({
+                        sub: MOCK_USER_CLAIMS.sub,
+                        name: MOCK_USERINFO_RESPONSE.name,
+                        email: MOCK_USERINFO_RESPONSE.email,
+                    }),
+                );
+
+                // Verify UserInfo was called
+                expect(openidMock.fetchUserInfo).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    MOCK_OPAQUE_TOKEN,
+                    MOCK_USER_CLAIMS.sub,
+                );
+
+                // Verify TokenContext includes userInfoResult
+                const tokenContext = mockStorageAdapter.findUserCalls[0];
+                expect(tokenContext?.userInfoResult).toEqual(
+                    MOCK_USERINFO_RESPONSE,
+                );
+                expect(tokenContext?.introspectionResponse).toBeDefined();
+            });
+
+            it('should combine claims correctly with UserInfo taking priority', async () => {
+                const jwtClaimsWithEmail = {
+                    ...MOCK_JWT_PAYLOAD,
+                    email: 'jwt@example.com',
+                    name: 'JWT Name',
+                };
+
+                joseMock.jwtVerify.mockResolvedValueOnce(
+                    createMockJwtVerifyResult(jwtClaimsWithEmail) as never,
+                );
+
+                const userInfoClaims = {
+                    sub: MOCK_USER_CLAIMS.sub,
+                    email: 'userinfo@example.com',
+                    name: 'UserInfo Name',
+                    phone: '+1234567890',
+                };
+
+                openidMock.fetchUserInfo.mockResolvedValueOnce(userInfoClaims);
+
+                const result =
+                    await beforeRetrievalAuthenticator.getUser(MOCK_JWT_TOKEN);
+
+                // UserInfo claims should take priority
+                expect(result).toEqual(
+                    expect.objectContaining({
+                        sub: MOCK_USER_CLAIMS.sub,
+                        email: 'userinfo@example.com', // UserInfo priority
+                        name: 'UserInfo Name', // UserInfo priority
+                        phone: '+1234567890', // Only in UserInfo
+                    }),
+                );
+            });
+        });
+
+        describe('Configuration', () => {
+            it('should default to afterUserRetrieval strategy when not specified', () => {
+                const defaultAuthenticator = new Authenticator({
+                    issuer: MOCK_ISSUER,
+                    clientId: MOCK_CLIENT_ID,
+                    clientSecret: MOCK_CLIENT_SECRET,
+                });
+
+                // The userInfoStrategy should be set to default value
+                expect((defaultAuthenticator as any).userInfoStrategy).toBe(
+                    'afterUserRetrieval',
+                );
+            });
+
+            it('should accept beforeUserRetrieval strategy in configuration', () => {
+                const beforeAuthenticator = new Authenticator({
+                    issuer: MOCK_ISSUER,
+                    clientId: MOCK_CLIENT_ID,
+                    clientSecret: MOCK_CLIENT_SECRET,
+                    userInfoStrategy: 'beforeUserRetrieval',
+                });
+
+                expect((beforeAuthenticator as any).userInfoStrategy).toBe(
+                    'beforeUserRetrieval',
+                );
+            });
         });
     });
 });
