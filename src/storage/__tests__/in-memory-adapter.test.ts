@@ -1,6 +1,13 @@
+import type { TokenContext, UserRecord } from '../../types/index.js';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { InMemoryStorageAdapter } from '../in-memory-adapter.js';
-import type { UserRecord } from '../../types/index.js';
+
+const createJwtTokenContext = (sub: string): TokenContext => ({
+    sub,
+    type: 'jwt',
+    jwtPayload: { sub },
+    metadata: { validatedAt: Date.now() },
+});
 
 describe('InMemoryStorageAdapter', () => {
     let adapter: InMemoryStorageAdapter;
@@ -21,7 +28,9 @@ describe('InMemoryStorageAdapter', () => {
         it('should store a user successfully', async () => {
             await adapter.storeUser(mockUser);
 
-            const retrievedUser = await adapter.findUser('user123');
+            const retrievedUser = await adapter.findUser(
+                createJwtTokenContext('user123'),
+            );
             expect(retrievedUser).toEqual(mockUser);
         });
 
@@ -38,7 +47,9 @@ describe('InMemoryStorageAdapter', () => {
 
             await adapter.storeUser(updatedUser);
 
-            const retrievedUser = await adapter.findUser('user123');
+            const retrievedUser = await adapter.findUser(
+                createJwtTokenContext('user123'),
+            );
             expect(retrievedUser).toEqual(updatedUser);
             expect(retrievedUser?.['name']).toBe('Updated Name');
             expect(retrievedUser?.['email']).toBe('updated@example.com');
@@ -51,7 +62,9 @@ describe('InMemoryStorageAdapter', () => {
 
             await adapter.storeUser(minimalUser);
 
-            const retrievedUser = await adapter.findUser('minimal-user');
+            const retrievedUser = await adapter.findUser(
+                createJwtTokenContext('minimal-user'),
+            );
             expect(retrievedUser).toEqual(minimalUser);
         });
     });
@@ -60,24 +73,30 @@ describe('InMemoryStorageAdapter', () => {
         it('should return user when found', async () => {
             await adapter.storeUser(mockUser);
 
-            const result = await adapter.findUser('user123');
+            const result = await adapter.findUser(
+                createJwtTokenContext('user123'),
+            );
             expect(result).toEqual(mockUser);
         });
 
         it('should return null when user not found', async () => {
-            const result = await adapter.findUser('nonexistent-user');
+            const result = await adapter.findUser(
+                createJwtTokenContext('nonexistent-user'),
+            );
             expect(result).toBeNull();
         });
 
         it('should return null for empty subject', async () => {
-            const result = await adapter.findUser('');
+            const result = await adapter.findUser(createJwtTokenContext(''));
             expect(result).toBeNull();
         });
 
         it('should be case-sensitive for subject matching', async () => {
             await adapter.storeUser(mockUser);
 
-            const result = await adapter.findUser('USER123'); // Different case
+            const result = await adapter.findUser(
+                createJwtTokenContext('USER123'),
+            ); // Different case
             expect(result).toBeNull();
         });
     });
@@ -92,15 +111,23 @@ describe('InMemoryStorageAdapter', () => {
             });
 
             // Verify users are stored
-            expect(await adapter.findUser('user123')).toBeTruthy();
-            expect(await adapter.findUser('user456')).toBeTruthy();
+            expect(
+                await adapter.findUser(createJwtTokenContext('user123')),
+            ).toBeTruthy();
+            expect(
+                await adapter.findUser(createJwtTokenContext('user456')),
+            ).toBeTruthy();
 
             // Clear all users
             adapter.clear();
 
             // Verify users are removed
-            expect(await adapter.findUser('user123')).toBeNull();
-            expect(await adapter.findUser('user456')).toBeNull();
+            expect(
+                await adapter.findUser(createJwtTokenContext('user123')),
+            ).toBeNull();
+            expect(
+                await adapter.findUser(createJwtTokenContext('user456')),
+            ).toBeNull();
         });
 
         it('should not affect subsequent store operations', async () => {
@@ -109,7 +136,9 @@ describe('InMemoryStorageAdapter', () => {
             adapter.clear();
             await adapter.storeUser(mockUser);
 
-            const result = await adapter.findUser('user123');
+            const result = await adapter.findUser(
+                createJwtTokenContext('user123'),
+            );
             expect(result).toEqual(mockUser);
         });
     });
@@ -133,8 +162,12 @@ describe('InMemoryStorageAdapter', () => {
             await adapter.storeUser(user2);
 
             // Retrieve both users
-            const retrievedUser1 = await adapter.findUser('user1');
-            const retrievedUser2 = await adapter.findUser('user2');
+            const retrievedUser1 = await adapter.findUser(
+                createJwtTokenContext('user1'),
+            );
+            const retrievedUser2 = await adapter.findUser(
+                createJwtTokenContext('user2'),
+            );
 
             expect(retrievedUser1).toEqual(user1);
             expect(retrievedUser2).toEqual(user2);
@@ -143,8 +176,12 @@ describe('InMemoryStorageAdapter', () => {
             const updatedUser1 = { ...user1, name: 'Updated First User' };
             await adapter.storeUser(updatedUser1);
 
-            expect(await adapter.findUser('user1')).toEqual(updatedUser1);
-            expect(await adapter.findUser('user2')).toEqual(user2); // Unchanged
+            expect(
+                await adapter.findUser(createJwtTokenContext('user1')),
+            ).toEqual(updatedUser1);
+            expect(
+                await adapter.findUser(createJwtTokenContext('user2')),
+            ).toEqual(user2); // Unchanged
         });
     });
 
@@ -171,7 +208,9 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             await adapter.storeUser(complexUser);
-            const retrieved = await adapter.findUser('complex-user');
+            const retrieved = await adapter.findUser(
+                createJwtTokenContext('complex-user'),
+            );
 
             expect(retrieved).toEqual(complexUser);
         });
@@ -186,7 +225,9 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             await adapter.storeUser(userWithUndefined);
-            const retrieved = await adapter.findUser('user-with-undefined');
+            const retrieved = await adapter.findUser(
+                createJwtTokenContext('user-with-undefined'),
+            );
 
             expect(retrieved).toEqual(userWithUndefined);
         });

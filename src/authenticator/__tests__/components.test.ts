@@ -1,8 +1,15 @@
+import type { TokenContext, UserRecord } from '../../types/index.js';
 import { describe, expect, it } from '@jest/globals';
 import { ConsoleLogger } from '../../utils/logger.js';
 import { InMemoryStorageAdapter } from '../../storage/index.js';
-import type { UserRecord } from '../../types/index.js';
 import { defaultUserInfoRefreshCondition } from '../../utils/refresh-conditions.js';
+
+const createJwtTokenContext = (sub: string): TokenContext => ({
+    sub,
+    type: 'jwt',
+    jwtPayload: { sub },
+    metadata: { validatedAt: Date.now() },
+});
 
 describe('Authenticator Components', () => {
     describe('Storage Integration', () => {
@@ -16,14 +23,18 @@ describe('Authenticator Components', () => {
             };
 
             await storageAdapter.storeUser(user);
-            const retrievedUser = await storageAdapter.findUser('user123');
+            const retrievedUser = await storageAdapter.findUser(
+                createJwtTokenContext('user123'),
+            );
 
             expect(retrievedUser).toEqual(user);
         });
 
         it('should return null for non-existent users', async () => {
             const storageAdapter = new InMemoryStorageAdapter();
-            const user = await storageAdapter.findUser('nonexistent');
+            const user = await storageAdapter.findUser(
+                createJwtTokenContext('nonexistent'),
+            );
             expect(user).toBeNull();
         });
     });

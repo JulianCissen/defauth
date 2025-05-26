@@ -1,12 +1,13 @@
-import { jest } from '@jest/globals';
 import type {
     AuthenticatorConfig,
+    IntrospectionResponse,
     Logger,
     StorageAdapter,
+    TokenContext,
     UserClaims,
     UserRecord,
 } from '../../types/index.js';
-import type { IntrospectionResponse } from 'oauth4webapi';
+import { jest } from '@jest/globals';
 
 /**
  * Mock OIDC endpoints and responses for testing
@@ -101,12 +102,12 @@ export const MOCK_USERINFO_RESPONSE = {
  */
 export class MockStorageAdapter implements StorageAdapter {
     private storage = new Map<string, UserRecord>();
-    public findUserCalls: string[] = [];
+    public findUserCalls: TokenContext[] = [];
     public storeUserCalls: UserRecord[] = [];
 
-    async findUser(sub: string): Promise<UserRecord | null> {
-        this.findUserCalls.push(sub);
-        return this.storage.get(sub) || null;
+    async findUser(context: TokenContext): Promise<UserRecord | null> {
+        this.findUserCalls.push(context);
+        return this.storage.get(context.sub) || null;
     }
 
     async storeUser(user: UserRecord): Promise<void> {

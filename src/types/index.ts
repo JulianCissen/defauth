@@ -1,3 +1,4 @@
+import type { IntrospectionResponse } from 'oauth4webapi';
 import { z } from 'zod';
 
 /**
@@ -67,6 +68,12 @@ export const UserRecordSchema = UserClaimsSchema.extend({
 });
 
 /**
+ * Type for OAuth2 introspection response
+ * Re-exported from oauth4webapi for convenience
+ */
+export type { IntrospectionResponse } from 'oauth4webapi';
+
+/**
  * Zod schema for introspection response validation
  * Only requires the 'active' field, all other fields are optional
  */
@@ -114,15 +121,48 @@ export interface AuthenticatorConfig {
 }
 
 /**
+ * Context for token validation - discriminated union based on validation type
+ */
+export type TokenContext =
+    | {
+          /** The subject identifier from the token */
+          sub: string;
+          /** The type of token validation that occurred */
+          type: 'jwt';
+          /** The full validated JWT payload */
+          jwtPayload: UserClaims;
+          /** Additional metadata about the validation process */
+          metadata?: {
+              /** Timestamp when this validation occurred */
+              validatedAt: number;
+          };
+      }
+    | {
+          /** The subject identifier from the token */
+          sub: string;
+          /** The type of token validation that occurred */
+          type: 'introspection';
+          /** The full introspection response */
+          introspectionResponse: IntrospectionResponse;
+          /** Additional metadata about the validation process */
+          metadata?: {
+              /** Whether introspection was forced for a JWT token */
+              forcedIntrospection?: boolean;
+              /** Timestamp when this validation occurred */
+              validatedAt: number;
+          };
+      };
+
+/**
  * Storage adapter interface for persisting user data
  */
 export interface StorageAdapter {
     /**
-     * Find a user by their subject identifier
-     * @param sub - The subject identifier
+     * Find a user by their token context
+     * @param context - The token validation context with full token information
      * @returns Promise resolving to user record or null if not found
      */
-    findUser(sub: string): Promise<UserRecord | null>;
+    findUser(context: TokenContext): Promise<UserRecord | null>;
 
     /**
      * Store or update user data

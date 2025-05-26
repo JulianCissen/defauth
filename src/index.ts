@@ -7,6 +7,7 @@ export type {
     UserRecord,
     AuthenticatorConfig,
     StorageAdapter,
+    TokenContext,
     UserInfoRefreshCondition,
     Logger,
     LogLevel,

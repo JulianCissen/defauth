@@ -4,6 +4,7 @@ import type {
     AuthenticatorConfig,
     Logger,
     StorageAdapter,
+    TokenContext,
     UserClaims,
     UserInfoRefreshCondition,
     UserRecord,
@@ -139,7 +140,16 @@ export class Authenticator {
         const userClaims =
             this.introspectionResponseToUserClaims(introspectionResult);
 
-        const userRecord = await this.storageAdapter.findUser(userClaims.sub);
+        const tokenContext: TokenContext = {
+            sub: userClaims.sub,
+            type: 'introspection',
+            introspectionResponse: introspectionResult,
+            metadata: {
+                validatedAt: Date.now(),
+            },
+        };
+
+        const userRecord = await this.storageAdapter.findUser(tokenContext);
 
         return this.processUserClaims(token, userClaims, {
             tokenType: 'opaque',
@@ -159,12 +169,36 @@ export class Authenticator {
         forceIntrospection?: boolean,
     ): Promise<UserClaims> {
         try {
-            const payload = await this.getValidatedJwtPayload(
+            const validationResult = await this.getValidatedJwtPayload(
                 token,
                 forceIntrospection,
             );
-            const userClaims = this.createUserClaimsFromPayload(payload);
-            const userRecord = await this.storageAdapter.findUser(payload.sub);
+            const userClaims = this.createUserClaimsFromPayload(
+                validationResult.payload,
+            );
+
+            const tokenContext: TokenContext =
+                validationResult.type === 'jwt'
+                    ? {
+                          sub: validationResult.payload.sub,
+                          type: 'jwt',
+                          jwtPayload: validationResult.payload,
+                          metadata: {
+                              validatedAt: Date.now(),
+                          },
+                      }
+                    : {
+                          sub: validationResult.payload.sub,
+                          type: 'introspection',
+                          introspectionResponse:
+                              validationResult.introspectionResponse,
+                          metadata: {
+                              forcedIntrospection: true,
+                              validatedAt: Date.now(),
+                          },
+                      };
+
+            const userRecord = await this.storageAdapter.findUser(tokenContext);
 
             return this.processUserClaims(token, userClaims, {
                 tokenType: 'jwt',
@@ -183,21 +217,35 @@ export class Authenticator {
      * Get validated JWT payload, either through signature verification or introspection
      * @param token - The JWT token
      * @param forceIntrospection - Whether to use introspection instead of signature verification
-     * @returns Promise resolving to validated payload
+     * @returns Promise resolving to validation result with payload and optional introspection response
      */
     private async getValidatedJwtPayload(
         token: string,
         forceIntrospection?: boolean,
-    ) {
+    ): Promise<
+        | { type: 'jwt'; payload: UserClaims }
+        | {
+              type: 'introspection';
+              payload: UserClaims;
+              introspectionResponse: IntrospectionResponse;
+          }
+    > {
         if (forceIntrospection) {
             const introspectionResult = await this.introspectToken(token);
             this.validateIntrospectionResult(introspectionResult);
-            return this.introspectionResponseToUserClaims(introspectionResult);
+            const payload =
+                this.introspectionResponseToUserClaims(introspectionResult);
+            return {
+                type: 'introspection',
+                payload,
+                introspectionResponse: introspectionResult,
+            };
         }
 
         const { payload: verifiedPayload } =
             await this.verifyJwtSignature(token);
-        return UserClaimsSchema.parse(verifiedPayload);
+        const payload = UserClaimsSchema.parse(verifiedPayload);
+        return { type: 'jwt', payload };
     }
 
     /**

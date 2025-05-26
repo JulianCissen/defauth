@@ -1,4 +1,8 @@
-import type { StorageAdapter, UserRecord } from '../types/index.js';
+import type {
+    StorageAdapter,
+    TokenContext,
+    UserRecord,
+} from '../types/index.js';
 
 /**
  * In-memory storage adapter implementation
@@ -8,12 +12,12 @@ export class InMemoryStorageAdapter implements StorageAdapter {
     private users: Map<string, UserRecord> = new Map();
 
     /**
-     * Find a user by their subject identifier
-     * @param sub - The subject identifier
+     * Find a user by their token context
+     * @param context - The token validation context with full token information
      * @returns Promise resolving to user record or null if not found
      */
-    async findUser(sub: string): Promise<UserRecord | null> {
-        return this.users.get(sub) || null;
+    async findUser(context: TokenContext): Promise<UserRecord | null> {
+        return this.users.get(context.sub) || null;
     }
 
     /**
