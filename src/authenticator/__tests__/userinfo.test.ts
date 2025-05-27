@@ -12,6 +12,8 @@ import {
 jest.unstable_mockModule('jose', () => ({
     jwtVerify: jest.fn(),
     createRemoteJWKSet: jest.fn(),
+    decodeProtectedHeader: jest.fn(),
+    decodeJwt: jest.fn(),
 }));
 
 jest.unstable_mockModule('openid-client', () => ({
@@ -69,6 +71,22 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         joseMock.jwtVerify.mockResolvedValue(
             createMockJwtVerifyResult() as never,
         );
+
+        // Setup jose mocks for JWT detection
+        joseMock.decodeProtectedHeader.mockReturnValue({
+            alg: 'RS256',
+            typ: 'JWT',
+        } as never);
+        joseMock.decodeJwt.mockReturnValue({
+            sub: 'user123',
+            name: 'Test User',
+            email: 'test@example.com',
+            iat: 1630000000,
+            exp: 9999999999,
+            aud: 'test-client-id',
+            iss: 'https://mock-oidc-provider.com',
+        } as never);
+
         openidMock.tokenIntrospection.mockResolvedValue(
             MOCK_INTROSPECTION_ACTIVE as never,
         );
