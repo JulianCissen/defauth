@@ -1,4 +1,8 @@
-import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
+import type {
+    AuthenticatorConfig,
+    StorageMetadata,
+    UserClaims,
+} from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -158,6 +162,44 @@ describe('Authenticator - Storage and Caching', () => {
                 expect(
                     storedCall.metadata.lastUserInfoRefresh!.getTime(),
                 ).toBeGreaterThanOrEqual(startTime.getTime());
+                expect(storedCall.metadata.lastIntrospection).toBeInstanceOf(
+                    Date,
+                );
+                expect(
+                    storedCall.metadata.lastIntrospection!.getTime(),
+                ).toBeGreaterThanOrEqual(startTime.getTime());
+            }
+        });
+
+        it('should update lastIntrospection when existing metadata is found for opaque tokens', async () => {
+            // This test verifies the bug fix where lastIntrospection metadata would not be set
+            // in handleOpaqueToken when a metadata object was returned from storage (only when null was returned).
+            // The bug was that `metadata.lastIntrospection = new Date()` was only set in the else branch
+            // when userRecord?.metadata was null, but not when existing metadata was found.
+
+            // Set up existing user with existing metadata (the bug scenario)
+            const existingUser = {
+                sub: MOCK_USER_CLAIMS.sub,
+                name: 'Existing User',
+                email: 'existing@example.com',
+            };
+            const existingMetadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+                lastIntrospection: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+            };
+            mockStorageAdapter.setUser(existingUser, existingMetadata);
+
+            const startTime = new Date();
+
+            // Process opaque token - this should update lastIntrospection even with existing metadata
+            await authenticator.getUser(MOCK_OPAQUE_TOKEN);
+
+            // Verify that lastIntrospection was set in the stored call
+            const storedCall = mockStorageAdapter.storeUserCalls[0];
+            expect(storedCall).toBeDefined();
+            if (storedCall) {
+                // The key assertion: lastIntrospection should be defined and updated
+                // even when existing metadata was found from storage
                 expect(storedCall.metadata.lastIntrospection).toBeInstanceOf(
                     Date,
                 );
