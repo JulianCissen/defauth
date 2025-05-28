@@ -220,9 +220,8 @@ export class Authenticator<TUser> {
 
         const userRecord = await this.storageAdapter.findUser(tokenContext);
         // Set intropection metadata
-        const metadata = userRecord?.metadata ?? {
-            lastIntrospection: new Date(),
-        };
+        const metadata = userRecord?.metadata ?? {};
+        metadata.lastIntrospection = new Date();
 
         return await this.processUserClaims(token, userClaims, {
             tokenType: 'opaque',
