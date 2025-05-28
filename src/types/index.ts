@@ -133,7 +133,7 @@ export interface JwtValidationOptions {
 /**
  * Configuration options for the authenticator
  */
-export interface AuthenticatorConfig<TUser = UserClaims> {
+export interface AuthenticatorConfig<TUser> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */
@@ -193,7 +193,7 @@ export interface TokenContext {
 /**
  * Storage adapter interface for persisting user data
  */
-export interface StorageAdapter<TUser = UserClaims> {
+export interface StorageAdapter<TUser> {
     /**
      * Find a user by their token context
      * @param context - The token validation context with full token information
