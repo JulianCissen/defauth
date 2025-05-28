@@ -32,7 +32,7 @@ import type { IntrospectionResponse } from 'oauth4webapi';
 /**
  * Main authenticator class that handles OIDC authentication and user management
  */
-export class Authenticator<TUser extends StorageMetadata> {
+export class Authenticator<TUser> {
     private clientConfig?: openid.Configuration;
     private storageAdapter: StorageAdapter<TUser>;
     private userInfoRefreshCondition: UserInfoRefreshCondition<TUser>;
@@ -192,7 +192,7 @@ export class Authenticator<TUser extends StorageMetadata> {
             sub: userClaims.sub,
             introspectionResponse: introspectionResult,
             metadata: {
-                validatedAt: Date.now(),
+                validatedAt: new Date(),
             },
         };
 
@@ -219,11 +219,15 @@ export class Authenticator<TUser extends StorageMetadata> {
         }
 
         const userRecord = await this.storageAdapter.findUser(tokenContext);
+        // Set intropection metadata
+        const metadata = userRecord?.metadata ?? {
+            lastIntrospection: new Date(),
+        };
 
         return await this.processUserClaims(token, userClaims, {
             tokenType: 'opaque',
-            userRecord,
-            lastIntrospection: Date.now(),
+            userRecord: userRecord?.user || null,
+            userMetadata: metadata,
             userInfoAlreadyFetched:
                 this.userInfoStrategy === 'beforeUserRetrieval' &&
                 !!tokenContext.userInfoResult,
@@ -275,11 +279,16 @@ export class Authenticator<TUser extends StorageMetadata> {
             }
 
             const userRecord = await this.storageAdapter.findUser(tokenContext);
+            // Set intropection metadata if introspection was used
+            const metadata = userRecord?.metadata ?? {};
+            if (validationResult.type === 'introspection') {
+                metadata.lastIntrospection = new Date();
+            }
 
             return await this.processUserClaims(token, userClaims, {
                 tokenType: 'jwt',
-                userRecord,
-                lastIntrospection: userRecord?.lastIntrospection,
+                userRecord: userRecord?.user || null,
+                userMetadata: metadata,
                 forceIntrospection: options?.forceIntrospection,
                 userInfoAlreadyFetched:
                     this.userInfoStrategy === 'beforeUserRetrieval' &&
@@ -400,13 +409,17 @@ export class Authenticator<TUser extends StorageMetadata> {
     /**
      * Determine if user info should be refreshed
      * @param userRecord - Existing user record or null
+     * @param userMetadata - Existing user metadata
      * @returns True if refresh is needed
      */
-    private shouldRefreshUserInfo(userRecord: TUser | null): boolean {
+    private shouldRefreshUserInfo(
+        userRecord: TUser | null,
+        userMetadata: StorageMetadata,
+    ): boolean {
         return (
             !userRecord ||
-            !userRecord.lastUserInfoRefresh ||
-            this.userInfoRefreshCondition(userRecord)
+            !userMetadata?.lastUserInfoRefresh ||
+            this.userInfoRefreshCondition(userRecord, userMetadata)
         );
     }
 
@@ -552,7 +565,7 @@ export class Authenticator<TUser extends StorageMetadata> {
      * @param options - Processing options
      * @param options.tokenType - Type of token being processed
      * @param options.userRecord - Existing user record if available
-     * @param options.lastIntrospection - Timestamp of last introspection
+     * @param options.userMetadata - Existing user metadata if available
      * @param options.forceIntrospection - Whether introspection was forced
      * @param options.userInfoAlreadyFetched - Whether UserInfo was already fetched (beforeUserRetrieval strategy)
      * @returns Promise resolving to processed user claims
@@ -563,7 +576,7 @@ export class Authenticator<TUser extends StorageMetadata> {
         options: {
             tokenType: 'jwt' | 'opaque';
             userRecord: TUser | null;
-            lastIntrospection?: number;
+            userMetadata: StorageMetadata;
             forceIntrospection?: boolean;
             userInfoAlreadyFetched?: boolean;
         },
@@ -571,15 +584,18 @@ export class Authenticator<TUser extends StorageMetadata> {
         const {
             tokenType,
             userRecord,
-            lastIntrospection,
+            userMetadata,
             forceIntrospection,
             userInfoAlreadyFetched,
         } = options;
         let finalClaims = userClaims;
-        let userInfoRefreshTime = userRecord?.lastUserInfoRefresh;
 
-        // Only fetch UserInfo if using afterUserRetrieval strategy or if not already fetched
-        if (!userInfoAlreadyFetched && this.shouldRefreshUserInfo(userRecord)) {
+        // Only fetch UserInfo if strategy is not 'none' and using afterUserRetrieval strategy or if not already fetched
+        if (
+            this.userInfoStrategy !== 'none' &&
+            !userInfoAlreadyFetched &&
+            this.shouldRefreshUserInfo(userRecord, userMetadata)
+        ) {
             try {
                 const userInfoClaims = await this.fetchUserInfo(
                     token,
@@ -590,7 +606,7 @@ export class Authenticator<TUser extends StorageMetadata> {
                     finalClaims,
                     userInfoClaims,
                 );
-                userInfoRefreshTime = Date.now();
+                userMetadata.lastUserInfoRefresh = new Date();
             } catch (error) {
                 this.handleUserInfoFailure(error as Error, {
                     tokenType,
@@ -600,16 +616,16 @@ export class Authenticator<TUser extends StorageMetadata> {
             }
         } else if (userInfoAlreadyFetched) {
             // UserInfo was already fetched in beforeUserRetrieval strategy
-            userInfoRefreshTime = Date.now();
+            userMetadata.lastUserInfoRefresh = new Date();
         }
 
-        return await this.storageAdapter.storeUser(userRecord, finalClaims, {
-            lastUserInfoRefresh: userInfoRefreshTime,
-            lastIntrospection:
-                tokenType === 'opaque' || forceIntrospection
-                    ? Date.now()
-                    : lastIntrospection,
-        });
+        const result = await this.storageAdapter.storeUser(
+            userRecord,
+            finalClaims,
+            userMetadata,
+        );
+
+        return result;
     }
 
     /**
@@ -670,7 +686,7 @@ export class Authenticator<TUser extends StorageMetadata> {
     ): TokenContext {
         const context: TokenContext = {
             sub: validationResult.payload.sub,
-            metadata: { validatedAt: Date.now() },
+            metadata: { validatedAt: new Date() },
         };
 
         if (validationResult.type === 'jwt') {

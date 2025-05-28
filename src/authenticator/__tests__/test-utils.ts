@@ -6,7 +6,6 @@ import type {
     StorageMetadata,
     TokenContext,
     UserClaims,
-    UserRecord,
 } from '../../types/index.js';
 import { jest } from '@jest/globals';
 
@@ -39,12 +38,11 @@ export const MOCK_USER_CLAIMS: UserClaims = {
 };
 
 /**
- * Mock user record with timestamps
+ * Mock user metadata with timestamps
  */
-export const MOCK_USER_RECORD: UserRecord = {
-    ...MOCK_USER_CLAIMS,
-    lastUserInfoRefresh: Date.now() - 30 * 60 * 1000, // 30 minutes ago
-    lastIntrospection: Date.now() - 5 * 60 * 1000, // 5 minutes ago
+export const MOCK_USER_METADATA: StorageMetadata = {
+    lastUserInfoRefresh: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+    lastIntrospection: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
 };
 
 /**
@@ -101,34 +99,53 @@ export const MOCK_USERINFO_RESPONSE = {
 /**
  * Mock storage adapter that tracks method calls
  */
-export class MockStorageAdapter implements StorageAdapter<UserRecord> {
-    private storage = new Map<string, UserRecord>();
+export class MockStorageAdapter<TUser = UserClaims>
+    implements StorageAdapter<TUser>
+{
+    private storage = new Map<
+        string,
+        { user: TUser; metadata: StorageMetadata }
+    >();
     public findUserCalls: TokenContext[] = [];
-    public storeUserCalls: UserRecord[] = [];
+    public storeUserCalls: Array<{
+        user: TUser | null;
+        claims: UserClaims;
+        metadata: StorageMetadata;
+    }> = [];
 
-    async findUser(context: TokenContext): Promise<UserRecord | null> {
+    async findUser(
+        context: TokenContext,
+    ): Promise<{ user: TUser; metadata: StorageMetadata } | null> {
         this.findUserCalls.push(context);
         return this.storage.get(context.sub) || null;
     }
 
     async storeUser(
-        user: UserRecord | null,
+        user: TUser | null,
         newClaims: UserClaims,
         metadata: StorageMetadata,
-    ): Promise<UserRecord> {
+    ): Promise<TUser> {
         // Create user record from claims if user is null, otherwise merge with existing
         const updatedUser = user
-            ? ({ ...user, ...newClaims, ...metadata } as UserRecord)
-            : ({ ...newClaims, ...metadata } as UserRecord);
+            ? ({ ...user, ...newClaims } as TUser)
+            : (newClaims as TUser);
 
-        this.storeUserCalls.push({ ...updatedUser });
-        this.storage.set(updatedUser.sub, updatedUser);
-        return Promise.resolve(updatedUser);
+        const result = { user: updatedUser, metadata };
+        this.storeUserCalls.push({ user, claims: newClaims, metadata });
+        this.storage.set(newClaims.sub, result);
+        return Promise.resolve(result.user);
+    }
+
+    async getAllUsers(): Promise<
+        Array<{ user: TUser; metadata: StorageMetadata }>
+    > {
+        return Array.from(this.storage.values());
     }
 
     // Test utilities
-    setUser(user: UserRecord): void {
-        this.storage.set(user.sub, user);
+    setUser(user: TUser, metadata: StorageMetadata = MOCK_USER_METADATA): void {
+        const userClaims = user as any;
+        this.storage.set(userClaims.sub, { user, metadata });
     }
 
     clear(): void {
@@ -137,7 +154,9 @@ export class MockStorageAdapter implements StorageAdapter<UserRecord> {
         this.storeUserCalls = [];
     }
 
-    getStoredUser(sub: string): UserRecord | undefined {
+    getStoredUser(
+        sub: string,
+    ): { user: TUser; metadata: StorageMetadata } | undefined {
         return this.storage.get(sub);
     }
 }
@@ -176,7 +195,7 @@ export class MockLogger implements Logger {
  * @param overrides - Partial configuration to override defaults
  * @returns Mock authenticator configuration
  */
-export const createMockConfig = <TUser extends StorageMetadata = UserRecord>(
+export const createMockConfig = <TUser = UserClaims>(
     overrides: Partial<AuthenticatorConfig<TUser>> = {},
 ): AuthenticatorConfig<TUser> => ({
     issuer: MOCK_ISSUER,
@@ -215,12 +234,24 @@ export const createMockJwtVerifyResult = (payload = MOCK_JWT_PAYLOAD) => ({
  * Utility to create fresh timestamps for testing
  * @returns Object with various timestamps for testing
  */
-export const createTimestamps = () => ({
-    now: Date.now(),
-    oneHourAgo: Date.now() - 60 * 60 * 1000,
-    fiveMinutesAgo: Date.now() - 5 * 60 * 1000,
-    tomorrow: Date.now() + 24 * 60 * 60 * 1000,
-});
+export const createTimestamps = () => {
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+    return {
+        now,
+        oneHourAgo,
+        fiveMinutesAgo,
+        tomorrow,
+        // Also provide number versions for compatibility with existing tests
+        nowMillis: now.getTime(),
+        oneHourAgoMillis: oneHourAgo.getTime(),
+        fiveMinutesAgoMillis: fiveMinutesAgo.getTime(),
+        tomorrowMillis: tomorrow.getTime(),
+    };
+};
 
 /**
  * Utility to wait for async operations

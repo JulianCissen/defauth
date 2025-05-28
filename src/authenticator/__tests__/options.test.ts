@@ -6,7 +6,7 @@ import {
     it,
     jest,
 } from '@jest/globals';
-import type { UserRecord } from '../../types/index.js';
+import type { UserClaims } from '../../types/index.js';
 
 // Mock external dependencies using ESM mocking
 jest.unstable_mockModule('jose', () => ({
@@ -25,8 +25,8 @@ jest.unstable_mockModule('openid-client', () => ({
 // Import modules after mocking
 const { Authenticator } = await import('../authenticator.js');
 
-// Type alias for the authenticated Authenticator with UserRecord
-type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
+// Type alias for the authenticated Authenticator with UserClaims
+type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -45,12 +45,12 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - Configuration Options and Validation', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
 
         // Setup default mocks
@@ -90,11 +90,11 @@ describe('Authenticator - Configuration Options and Validation', () => {
     });
 
     describe('JWT Validation Options', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             // Create authenticator with custom global JWT validation options
-            const configWithJwtOptions = createMockConfig({
+            const configWithJwtOptions = createMockConfig<UserClaims>({
                 storageAdapter: mockStorageAdapter,
                 logger: mockLogger,
                 jwtValidationOptions: {
@@ -208,7 +208,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
             if (tokenContext) {
                 expect(tokenContext.jwtPayload).toBeDefined();
                 expect(tokenContext.sub).toBe(MOCK_USER_CLAIMS.sub);
-                expect(tokenContext.metadata?.validatedAt).toBeGreaterThan(0);
+                expect(tokenContext.metadata?.validatedAt).toBeInstanceOf(Date);
                 expect(tokenContext.jwtPayload).toBeDefined();
             }
         });
@@ -224,7 +224,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
             if (tokenContext) {
                 expect(tokenContext.introspectionResponse).toBeDefined();
                 expect(tokenContext.sub).toBe(MOCK_USER_CLAIMS.sub);
-                expect(tokenContext.metadata?.validatedAt).toBeGreaterThan(0);
+                expect(tokenContext.metadata?.validatedAt).toBeInstanceOf(Date);
                 expect(tokenContext.introspectionResponse).toBeDefined();
                 expect(tokenContext.metadata?.forcedIntrospection).toBe(true);
             }
@@ -272,11 +272,11 @@ describe('Authenticator - Configuration Options and Validation', () => {
     });
 
     describe('Default JWT Validation Options', () => {
-        let defaultAuthenticator: UserRecordAuthenticator;
+        let defaultAuthenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             // Create authenticator without custom JWT validation options
-            const defaultConfig = createMockConfig({
+            const defaultConfig = createMockConfig<UserClaims>({
                 storageAdapter: mockStorageAdapter,
                 logger: mockLogger,
             });

@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
+import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -25,8 +25,8 @@ jest.unstable_mockModule('openid-client', () => ({
 // Import modules after mocking
 const { Authenticator } = await import('../authenticator.js');
 
-// Type alias for the authenticated Authenticator with UserRecord
-type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
+// Type alias for the authenticated Authenticator with UserClaims
+type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
 const {
     MOCK_CLIENT_ID,
     MOCK_CLIENT_SECRET,
@@ -50,15 +50,15 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - UserInfo Integration and Management', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserRecord>;
+    let mockConfig: AuthenticatorConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
-        mockConfig = createMockConfig({
+        mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
             logger: mockLogger,
         });
@@ -100,7 +100,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
     });
 
     describe('UserInfo Integration', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -155,7 +155,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
     });
 
     describe('UserInfo Strategy', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -215,7 +215,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         });
 
         describe('beforeUserRetrieval strategy', () => {
-            let beforeRetrievalAuthenticator: UserRecordAuthenticator;
+            let beforeRetrievalAuthenticator: UserClaimsAuthenticator;
 
             beforeEach(() => {
                 beforeRetrievalAuthenticator = new Authenticator({

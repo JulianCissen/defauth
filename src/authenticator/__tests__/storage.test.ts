@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
+import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -26,8 +26,8 @@ jest.unstable_mockModule('openid-client', () => ({
 const { Authenticator } = await import('../authenticator.js');
 const { InMemoryStorageAdapter } = await import('../../storage/index.js');
 
-// Type alias for the authenticated Authenticator with UserRecord
-type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
+// Type alias for the authenticated Authenticator with UserClaims
+type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -47,15 +47,15 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - Storage and Caching', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserRecord>;
+    let mockConfig: AuthenticatorConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
-        mockConfig = createMockConfig({
+        mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
             logger: mockLogger,
         });
@@ -97,7 +97,7 @@ describe('Authenticator - Storage and Caching', () => {
     });
 
     describe('Storage Integration', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -108,10 +108,13 @@ describe('Authenticator - Storage and Caching', () => {
             await authenticator.getUser(MOCK_JWT_TOKEN);
 
             expect(mockStorageAdapter.storeUserCalls).toHaveLength(1);
-            const storedUser = mockStorageAdapter.storeUserCalls[0];
-            if (storedUser) {
-                expect(storedUser.sub).toBe(MOCK_USER_CLAIMS.sub);
-                expect(storedUser).toHaveProperty('lastUserInfoRefresh');
+            const storedCall = mockStorageAdapter.storeUserCalls[0];
+            if (storedCall) {
+                expect(storedCall.claims.sub).toBe(MOCK_USER_CLAIMS.sub);
+                expect(storedCall.metadata.lastUserInfoRefresh).toBeInstanceOf(
+                    Date,
+                );
+                expect(storedCall.metadata.lastIntrospection).toBeUndefined();
             }
         });
 
@@ -126,32 +129,41 @@ describe('Authenticator - Storage and Caching', () => {
         });
 
         it('should update timestamps correctly for JWT tokens', async () => {
-            const startTime = Date.now();
+            const startTime = new Date();
 
             await authenticator.getUser(MOCK_JWT_TOKEN);
 
-            const storedUser = mockStorageAdapter.storeUserCalls[0];
-            if (storedUser) {
-                expect(storedUser.lastUserInfoRefresh).toBeGreaterThanOrEqual(
-                    startTime,
+            const storedCall = mockStorageAdapter.storeUserCalls[0];
+            if (storedCall) {
+                expect(storedCall.metadata.lastUserInfoRefresh).toBeInstanceOf(
+                    Date,
                 );
-                expect(storedUser.lastIntrospection).toBeUndefined();
+                expect(
+                    storedCall.metadata.lastUserInfoRefresh!.getTime(),
+                ).toBeGreaterThanOrEqual(startTime.getTime());
+                expect(storedCall.metadata.lastIntrospection).toBeUndefined();
             }
         });
 
         it('should update timestamps correctly for opaque tokens', async () => {
-            const startTime = Date.now();
+            const startTime = new Date();
 
             await authenticator.getUser(MOCK_OPAQUE_TOKEN);
 
-            const storedUser = mockStorageAdapter.storeUserCalls[0];
-            if (storedUser) {
-                expect(storedUser.lastUserInfoRefresh).toBeGreaterThanOrEqual(
-                    startTime,
+            const storedCall = mockStorageAdapter.storeUserCalls[0];
+            if (storedCall) {
+                expect(storedCall.metadata.lastUserInfoRefresh).toBeInstanceOf(
+                    Date,
                 );
-                expect(storedUser.lastIntrospection).toBeGreaterThanOrEqual(
-                    startTime,
+                expect(
+                    storedCall.metadata.lastUserInfoRefresh!.getTime(),
+                ).toBeGreaterThanOrEqual(startTime.getTime());
+                expect(storedCall.metadata.lastIntrospection).toBeInstanceOf(
+                    Date,
                 );
+                expect(
+                    storedCall.metadata.lastIntrospection!.getTime(),
+                ).toBeGreaterThanOrEqual(startTime.getTime());
             }
         });
     });

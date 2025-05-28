@@ -1,16 +1,21 @@
-import type { TokenContext, UserRecord } from '../../types/index.js';
+import type {
+    StorageMetadata,
+    TokenContext,
+    UserClaims,
+} from '../../types/index.js';
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { InMemoryStorageAdapter } from '../in-memory-adapter.js';
 
 const createJwtTokenContext = (sub: string): TokenContext => ({
     sub,
     jwtPayload: { sub },
-    metadata: { validatedAt: Date.now() },
+    metadata: { validatedAt: new Date() },
 });
 
 describe('InMemoryStorageAdapter', () => {
-    let adapter: InMemoryStorageAdapter<UserRecord>;
-    let mockUser: UserRecord;
+    let adapter: InMemoryStorageAdapter<UserClaims>;
+    let mockUser: UserClaims;
+    let mockMetadata: StorageMetadata;
 
     beforeEach(() => {
         adapter = new InMemoryStorageAdapter();
@@ -18,64 +23,93 @@ describe('InMemoryStorageAdapter', () => {
             sub: 'user123',
             name: 'Test User',
             email: 'test@example.com',
-            lastUserInfoRefresh: Date.now(),
-            lastIntrospection: Date.now(),
+        };
+        mockMetadata = {
+            lastUserInfoRefresh: new Date(),
+            lastIntrospection: new Date(),
         };
     });
 
     describe('storeUser', () => {
         it('should store a user successfully', async () => {
-            await adapter.storeUser(mockUser, mockUser, {});
+            const result = await adapter.storeUser(
+                mockUser,
+                mockUser,
+                mockMetadata,
+            );
 
-            const retrievedUser = await adapter.findUser(
+            expect(result).toEqual(mockUser);
+
+            const retrievedResult = await adapter.findUser(
                 createJwtTokenContext('user123'),
             );
-            expect(retrievedUser).toEqual(mockUser);
+            expect(retrievedResult?.user).toEqual(mockUser);
+            expect(retrievedResult?.metadata).toEqual(mockMetadata);
         });
 
         it('should update existing user', async () => {
             // Store initial user
-            await adapter.storeUser(mockUser, mockUser, {});
+            await adapter.storeUser(mockUser, mockUser, mockMetadata);
 
             // Update user with new data
-            const updatedUser: UserRecord = {
+            const updatedUser: UserClaims = {
                 ...mockUser,
                 name: 'Updated Name',
                 email: 'updated@example.com',
             };
 
-            await adapter.storeUser(updatedUser, updatedUser, {});
+            const updatedMetadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(),
+                lastIntrospection: new Date(),
+            };
 
-            const retrievedUser = await adapter.findUser(
+            const result = await adapter.storeUser(
+                updatedUser,
+                updatedUser,
+                updatedMetadata,
+            );
+
+            expect(result).toEqual(updatedUser);
+
+            const retrievedResult = await adapter.findUser(
                 createJwtTokenContext('user123'),
             );
-            expect(retrievedUser).toEqual(updatedUser);
-            expect(retrievedUser?.['name']).toBe('Updated Name');
-            expect(retrievedUser?.['email']).toBe('updated@example.com');
+            expect(retrievedResult?.user).toEqual(updatedUser);
+            expect(retrievedResult?.user['name']).toBe('Updated Name');
+            expect(retrievedResult?.user['email']).toBe('updated@example.com');
         });
 
         it('should handle users with only required fields', async () => {
-            const minimalUser: UserRecord = {
+            const minimalUser: UserClaims = {
                 sub: 'minimal-user',
             };
 
-            await adapter.storeUser(minimalUser, minimalUser, {});
+            const minimalMetadata: StorageMetadata = {};
 
-            const retrievedUser = await adapter.findUser(
+            const result = await adapter.storeUser(
+                minimalUser,
+                minimalUser,
+                minimalMetadata,
+            );
+
+            expect(result).toEqual(minimalUser);
+
+            const retrievedResult = await adapter.findUser(
                 createJwtTokenContext('minimal-user'),
             );
-            expect(retrievedUser).toEqual(minimalUser);
+            expect(retrievedResult?.user).toEqual(minimalUser);
         });
     });
 
     describe('findUser', () => {
-        it('should return user when found', async () => {
-            await adapter.storeUser(mockUser, mockUser, {});
+        it('should return user and metadata when found', async () => {
+            await adapter.storeUser(mockUser, mockUser, mockMetadata);
 
             const result = await adapter.findUser(
                 createJwtTokenContext('user123'),
             );
-            expect(result).toEqual(mockUser);
+            expect(result?.user).toEqual(mockUser);
+            expect(result?.metadata).toEqual(mockMetadata);
         });
 
         it('should return null when user not found', async () => {
@@ -91,7 +125,7 @@ describe('InMemoryStorageAdapter', () => {
         });
 
         it('should be case-sensitive for subject matching', async () => {
-            await adapter.storeUser(mockUser, mockUser, {});
+            await adapter.storeUser(mockUser, mockUser, mockMetadata);
 
             const result = await adapter.findUser(
                 createJwtTokenContext('USER123'),
@@ -139,19 +173,19 @@ describe('InMemoryStorageAdapter', () => {
             const result = await adapter.findUser(
                 createJwtTokenContext('user123'),
             );
-            expect(result).toEqual(mockUser);
+            expect(result?.user).toEqual(mockUser);
         });
     });
 
     describe('multiple users', () => {
         it('should handle multiple users independently', async () => {
-            const user1: UserRecord = {
+            const user1: UserClaims = {
                 sub: 'user1',
                 name: 'First User',
                 email: 'first@example.com',
             };
 
-            const user2: UserRecord = {
+            const user2: UserClaims = {
                 sub: 'user2',
                 name: 'Second User',
                 email: 'second@example.com',
@@ -169,25 +203,25 @@ describe('InMemoryStorageAdapter', () => {
                 createJwtTokenContext('user2'),
             );
 
-            expect(retrievedUser1).toEqual(user1);
-            expect(retrievedUser2).toEqual(user2);
+            expect(retrievedUser1?.user).toEqual(user1);
+            expect(retrievedUser2?.user).toEqual(user2);
 
             // Update one user shouldn't affect the other
             const updatedUser1 = { ...user1, name: 'Updated First User' };
             await adapter.storeUser(updatedUser1, updatedUser1, {});
 
             expect(
-                await adapter.findUser(createJwtTokenContext('user1')),
+                (await adapter.findUser(createJwtTokenContext('user1')))?.user,
             ).toEqual(updatedUser1);
             expect(
-                await adapter.findUser(createJwtTokenContext('user2')),
+                (await adapter.findUser(createJwtTokenContext('user2')))?.user,
             ).toEqual(user2); // Unchanged
         });
     });
 
     describe('data integrity', () => {
         it('should preserve all user properties', async () => {
-            const complexUser: UserRecord = {
+            const complexUser: UserClaims = {
                 sub: 'complex-user',
                 name: 'Complex User',
                 email: 'complex@example.com',
@@ -203,33 +237,45 @@ describe('InMemoryStorageAdapter', () => {
                     key2: { nestedKey: 'nestedValue' },
                 },
                 array_claim: ['item1', 'item2', 'item3'],
-                lastUserInfoRefresh: 1640995200000,
-                lastIntrospection: 1640995200000,
             };
 
-            await adapter.storeUser(complexUser, complexUser, {});
+            const complexMetadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(1640995200000),
+                lastIntrospection: new Date(1640995200000),
+            };
+
+            await adapter.storeUser(complexUser, complexUser, complexMetadata);
             const retrieved = await adapter.findUser(
                 createJwtTokenContext('complex-user'),
             );
 
-            expect(retrieved).toEqual(complexUser);
+            expect(retrieved?.user).toEqual(complexUser);
+            expect(retrieved?.metadata).toEqual(complexMetadata);
         });
 
         it('should handle undefined optional properties', async () => {
-            const userWithUndefined: UserRecord = {
+            const userWithUndefined: UserClaims = {
                 sub: 'user-with-undefined',
                 name: undefined,
                 email: 'test@example.com',
-                lastUserInfoRefresh: undefined,
-                lastIntrospection: Date.now(),
             };
 
-            await adapter.storeUser(userWithUndefined, userWithUndefined, {});
+            const metadataWithUndefined: StorageMetadata = {
+                lastUserInfoRefresh: undefined,
+                lastIntrospection: new Date(Date.now()),
+            };
+
+            await adapter.storeUser(
+                userWithUndefined,
+                userWithUndefined,
+                metadataWithUndefined,
+            );
             const retrieved = await adapter.findUser(
                 createJwtTokenContext('user-with-undefined'),
             );
 
-            expect(retrieved).toEqual(userWithUndefined);
+            expect(retrieved?.user).toEqual(userWithUndefined);
+            expect(retrieved?.metadata).toEqual(metadataWithUndefined);
         });
     });
 
@@ -241,13 +287,13 @@ describe('InMemoryStorageAdapter', () => {
         });
 
         it('should return all stored users', async () => {
-            const user1: UserRecord = {
+            const user1: UserClaims = {
                 sub: 'user1',
                 name: 'First User',
                 email: 'first@example.com',
             };
 
-            const user2: UserRecord = {
+            const user2: UserClaims = {
                 sub: 'user2',
                 name: 'Second User',
                 email: 'second@example.com',
@@ -258,8 +304,8 @@ describe('InMemoryStorageAdapter', () => {
 
             const users = adapter.getAllUsers();
             expect(users).toHaveLength(2);
-            expect(users).toContainEqual(user1);
-            expect(users).toContainEqual(user2);
+            expect(users.map((u) => u.user)).toContainEqual(user1);
+            expect(users.map((u) => u.user)).toContainEqual(user2);
         });
 
         it('should return updated user data', async () => {
@@ -270,8 +316,8 @@ describe('InMemoryStorageAdapter', () => {
 
             const users = adapter.getAllUsers();
             expect(users).toHaveLength(1);
-            expect(users[0]).toEqual(updatedUser);
-            expect(users[0]?.['name']).toBe('Updated Name');
+            expect(users[0]?.user).toEqual(updatedUser);
+            expect(users[0]?.user['name']).toBe('Updated Name');
         });
 
         it('should return empty array after clear', async () => {
@@ -292,39 +338,46 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             const metadata = {
-                lastUserInfoRefresh: Date.now(),
-                lastIntrospection: Date.now() - 5000,
+                lastUserInfoRefresh: new Date(),
+                lastIntrospection: new Date(Date.now() - 5000),
             };
 
             // Store user with separated metadata
             await adapter.storeUser(null, userClaims, metadata);
 
-            const retrievedUser = await adapter.findUser(
+            const retrievedResult = await adapter.findUser(
                 createJwtTokenContext('test-metadata-user'),
             );
 
-            expect(retrievedUser).toBeDefined();
-            expect(retrievedUser?.sub).toBe('test-metadata-user');
-            expect(retrievedUser?.['name']).toBe('Test User');
-            expect(retrievedUser?.['email']).toBe('test@example.com');
-            expect(retrievedUser?.lastUserInfoRefresh).toBe(
+            expect(retrievedResult).toBeDefined();
+            expect(retrievedResult?.user.sub).toBe('test-metadata-user');
+            expect(retrievedResult?.user['name']).toBe('Test User');
+            expect(retrievedResult?.user['email']).toBe('test@example.com');
+            expect(retrievedResult?.metadata.lastUserInfoRefresh).toBe(
                 metadata.lastUserInfoRefresh,
             );
-            expect(retrievedUser?.lastIntrospection).toBe(
+            expect(retrievedResult?.metadata.lastIntrospection).toBe(
                 metadata.lastIntrospection,
             );
         });
 
         it('should merge metadata with existing user data', async () => {
-            const existingUser: UserRecord = {
+            const existingUser: UserClaims = {
                 sub: 'existing-user',
                 name: 'Existing User',
                 email: 'existing@example.com',
                 role: 'user',
-                lastUserInfoRefresh: Date.now() - 10000,
             };
 
-            await adapter.storeUser(existingUser, existingUser, {});
+            const existingMetadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(Date.now() - 10000),
+            };
+
+            await adapter.storeUser(
+                existingUser,
+                existingUser,
+                existingMetadata,
+            );
 
             const newClaims = {
                 sub: 'existing-user',
@@ -334,26 +387,26 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             const newMetadata = {
-                lastUserInfoRefresh: Date.now(),
-                lastIntrospection: Date.now() - 1000,
+                lastUserInfoRefresh: new Date(),
+                lastIntrospection: new Date(Date.now() - 1000),
             };
 
             // Update user with new claims and metadata
             await adapter.storeUser(existingUser, newClaims, newMetadata);
 
-            const updatedUser = await adapter.findUser(
+            const updatedResult = await adapter.findUser(
                 createJwtTokenContext('existing-user'),
             );
 
-            expect(updatedUser).toBeDefined();
-            expect(updatedUser?.['name']).toBe('Updated User');
-            expect(updatedUser?.['email']).toBe('updated@example.com');
-            expect(updatedUser?.['department']).toBe('Engineering');
-            expect(updatedUser?.['role']).toBe('user'); // Should preserve existing data
-            expect(updatedUser?.lastUserInfoRefresh).toBe(
+            expect(updatedResult).toBeDefined();
+            expect(updatedResult?.user['name']).toBe('Updated User');
+            expect(updatedResult?.user['email']).toBe('updated@example.com');
+            expect(updatedResult?.user['department']).toBe('Engineering');
+            expect(updatedResult?.user['role']).toBe('user'); // Should preserve existing data
+            expect(updatedResult?.metadata.lastUserInfoRefresh).toBe(
                 newMetadata.lastUserInfoRefresh,
             );
-            expect(updatedUser?.lastIntrospection).toBe(
+            expect(updatedResult?.metadata.lastIntrospection).toBe(
                 newMetadata.lastIntrospection,
             );
         });

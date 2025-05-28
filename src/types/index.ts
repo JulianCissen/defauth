@@ -63,10 +63,10 @@ export interface UserClaims {
  * Metadata claims for internal storage management
  */
 export interface StorageMetadata {
-    /** Timestamp of last user info refresh (in milliseconds) */
-    lastUserInfoRefresh?: number;
-    /** Timestamp of last introspection (in milliseconds) */
-    lastIntrospection?: number;
+    /** Timestamp of last user info refresh */
+    lastUserInfoRefresh?: Date;
+    /** Timestamp of last introspection */
+    lastIntrospection?: Date;
 }
 
 /**
@@ -78,8 +78,8 @@ export type UserRecord = UserClaims & StorageMetadata;
  * Zod schema for user record validation
  */
 export const UserRecordSchema = UserClaimsSchema.extend({
-    lastUserInfoRefresh: z.number().optional(),
-    lastIntrospection: z.number().optional(),
+    lastUserInfoRefresh: z.instanceof(Date).optional(),
+    lastIntrospection: z.instanceof(Date).optional(),
 });
 
 /**
@@ -105,14 +105,18 @@ export const IntrospectionResponseSchema = z
  * Function type for determining when to refresh user info
  * This determines when user info should be refreshed from the OIDC provider
  */
-export type UserInfoRefreshCondition<
-    TUser extends StorageMetadata = StorageMetadata,
-> = (user: TUser) => boolean;
+export type UserInfoRefreshCondition<TUser> = (
+    user: TUser,
+    metadata: StorageMetadata,
+) => boolean;
 
 /**
  * Strategy for when to fetch UserInfo during the authentication process
  */
-export type UserInfoStrategy = 'afterUserRetrieval' | 'beforeUserRetrieval';
+export type UserInfoStrategy =
+    | 'afterUserRetrieval'
+    | 'beforeUserRetrieval'
+    | 'none';
 
 /**
  * JWT validation options
@@ -129,7 +133,7 @@ export interface JwtValidationOptions {
 /**
  * Configuration options for the authenticator
  */
-export interface AuthenticatorConfig<TUser extends StorageMetadata> {
+export interface AuthenticatorConfig<TUser = UserClaims> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */
@@ -147,6 +151,7 @@ export interface AuthenticatorConfig<TUser extends StorageMetadata> {
      * Strategy for when to fetch UserInfo during authentication (defaults to 'afterUserRetrieval')
      * - 'afterUserRetrieval': Fetch UserInfo after finding user in storage (original behavior)
      * - 'beforeUserRetrieval': Fetch UserInfo before storage lookup and include in TokenContext
+     * - 'none': Never fetch UserInfo from the endpoint
      */
     userInfoStrategy?: UserInfoStrategy;
     /**
@@ -179,7 +184,7 @@ export interface TokenContext {
     /** Additional metadata about the validation process */
     metadata?: {
         /** Timestamp when this validation occurred */
-        validatedAt?: number;
+        validatedAt?: Date;
         /** Whether introspection was forced for a JWT token */
         forcedIntrospection?: boolean;
     };
@@ -188,13 +193,16 @@ export interface TokenContext {
 /**
  * Storage adapter interface for persisting user data
  */
-export interface StorageAdapter<TUser extends StorageMetadata> {
+export interface StorageAdapter<TUser = UserClaims> {
     /**
      * Find a user by their token context
      * @param context - The token validation context with full token information
-     * @returns Promise resolving to user record or null if not found
+     * @returns Promise resolving to user record and metadata, or null if not found
      */
-    findUser(context: TokenContext): Promise<TUser | null>;
+    findUser(context: TokenContext): Promise<{
+        user: TUser;
+        metadata: StorageMetadata;
+    } | null>;
 
     /**
      * Store or update user data

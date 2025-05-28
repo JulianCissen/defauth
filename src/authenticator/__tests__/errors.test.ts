@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
+import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -25,8 +25,8 @@ jest.unstable_mockModule('openid-client', () => ({
 // Import modules after mocking
 const { Authenticator } = await import('../authenticator.js');
 
-// Type alias for the authenticated Authenticator with UserRecord
-type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
+// Type alias for the authenticated Authenticator with UserClaims
+type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_PAYLOAD,
@@ -47,15 +47,15 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - Error Handling and Edge Cases', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserRecord>;
+    let mockConfig: AuthenticatorConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
-        mockConfig = createMockConfig({
+        mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
             logger: mockLogger,
         });
@@ -97,7 +97,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
     });
 
     describe('Error Handling', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -160,9 +160,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const existingUser = {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'existing user',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ), // 2 hours ago
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 const brokenAuthenticator = new Authenticator(mockConfig);
                 await waitForAsync();
@@ -203,9 +207,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const staleUser = {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Stale User',
-                    lastUserInfoRefresh: Date.now() - 25 * 60 * 60 * 1000, // 25 hours ago, beyond refresh threshold
                 };
-                mockStorageAdapter.setUser(staleUser);
+                const staleMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 25 * 60 * 60 * 1000,
+                    ), // 25 hours ago, beyond refresh threshold
+                };
+                mockStorageAdapter.setUser(staleUser, staleMetadata);
 
                 // Mock JWT verification to bypass token validation
                 joseMock.jwtVerify.mockResolvedValue(
@@ -235,9 +243,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 // Force UserInfo refresh by having old timestamp
                 const existingUser = {
                     sub: MOCK_USER_CLAIMS.sub,
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000,
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ),
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 // Should handle gracefully by default (throwOnUserInfoFailure: false)
                 const result = await noUserInfoAuth.getUser(MOCK_JWT_TOKEN);
@@ -275,9 +287,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 // Force UserInfo refresh by having old timestamp
                 const existingUser = {
                     sub: MOCK_USER_CLAIMS.sub,
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000,
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ),
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 await expect(
                     noUserInfoAuth.getUser(MOCK_JWT_TOKEN),
@@ -335,9 +351,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Existing User',
                     email: 'existing@example.com',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ), // 2 hours ago
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 // Mock UserInfo failure
                 const userInfoError = new Error('UserInfo endpoint failed');
@@ -354,8 +374,10 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
 
                 // Verify combineClaimsWithPriority was called
                 expect(mockStorageAdapter.storeUserCalls).toHaveLength(1);
-                const storedUser = mockStorageAdapter.storeUserCalls[0];
-                expect(storedUser?.['name']).toBe(MOCK_USER_CLAIMS['name']);
+                const storedCall = mockStorageAdapter.storeUserCalls[0];
+                expect(storedCall?.claims['name']).toBe(
+                    MOCK_USER_CLAIMS['name'],
+                );
             });
 
             it('should throw error when UserInfo fails and throwOnUserInfoFailure is enabled', async () => {
@@ -372,9 +394,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const existingUser = {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Existing User',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000,
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ),
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 // Mock UserInfo failure
                 openidMock.fetchUserInfo.mockRejectedValue(
@@ -392,9 +418,14 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const userWithoutTimestamp = {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'User',
+                };
+                const metadataWithoutTimestamp = {
                     // Missing lastUserInfoRefresh
                 };
-                mockStorageAdapter.setUser(userWithoutTimestamp);
+                mockStorageAdapter.setUser(
+                    userWithoutTimestamp,
+                    metadataWithoutTimestamp,
+                );
 
                 const result = await authenticator.getUser(MOCK_JWT_TOKEN);
 
@@ -462,7 +493,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const storedUser = mockStorageAdapter.getStoredUser(
                     MOCK_USER_CLAIMS.sub,
                 );
-                expect(storedUser?.sub).toBe(MOCK_USER_CLAIMS.sub);
+                expect(storedUser?.user.sub).toBe(MOCK_USER_CLAIMS.sub);
             });
 
             it('should preserve timestamps when UserInfo refresh is not needed', async () => {
@@ -474,10 +505,12 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Existing User',
                     email: 'existing@example.com',
-                    lastUserInfoRefresh: Date.now() - 30 * 1000, // 30 seconds ago (very recent)
-                    lastIntrospection: Date.now() - 30 * 1000, // 30 seconds ago
                 };
-                mockStorageAdapter.setUser(recentUser);
+                const recentMetadata = {
+                    lastUserInfoRefresh: new Date(Date.now() - 30 * 1000), // 30 seconds ago (very recent)
+                    lastIntrospection: new Date(Date.now() - 30 * 1000), // 30 seconds ago
+                };
+                mockStorageAdapter.setUser(recentUser, recentMetadata);
 
                 // Clear any previous fetchUserInfo calls and mock JWT verification
                 openidMock.fetchUserInfo.mockClear();
@@ -495,9 +528,9 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 const storedUser = mockStorageAdapter.getStoredUser(
                     MOCK_USER_CLAIMS.sub,
                 );
-                expect(storedUser?.sub).toBe(MOCK_USER_CLAIMS.sub);
-                expect(storedUser?.lastUserInfoRefresh).toBe(
-                    recentUser.lastUserInfoRefresh,
+                expect(storedUser?.user.sub).toBe(MOCK_USER_CLAIMS.sub);
+                expect(storedUser?.metadata.lastUserInfoRefresh).toEqual(
+                    recentMetadata.lastUserInfoRefresh,
                 ); // Should preserve existing timestamp
             });
         });
@@ -510,9 +543,13 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     name: 'Old Name',
                     email: 'old@example.com',
                     role: 'user',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000,
                 };
-                mockStorageAdapter.setUser(existingUser);
+                const existingMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ),
+                };
+                mockStorageAdapter.setUser(existingUser, existingMetadata);
 
                 // Mock UserInfo with updated data
                 openidMock.fetchUserInfo.mockResolvedValue({
@@ -614,7 +651,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
     });
 
     describe('Edge Cases', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);

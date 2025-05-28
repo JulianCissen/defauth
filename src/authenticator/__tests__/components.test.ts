@@ -1,4 +1,8 @@
-import type { TokenContext, UserRecord } from '../../types/index.js';
+import type {
+    StorageMetadata,
+    TokenContext,
+    UserClaims,
+} from '../../types/index.js';
 import { describe, expect, it } from '@jest/globals';
 import { ConsoleLogger } from '../../utils/logger.js';
 import { InMemoryStorageAdapter } from '../../storage/index.js';
@@ -7,34 +11,39 @@ import { defaultUserInfoRefreshCondition } from '../../utils/refresh-conditions.
 const createJwtTokenContext = (sub: string): TokenContext => ({
     sub,
     jwtPayload: { sub },
-    metadata: { validatedAt: Date.now() },
+    metadata: { validatedAt: new Date() },
 });
 
 describe('Authenticator - Component Integration and Utilities', () => {
     describe('Storage Integration', () => {
         it('should store and retrieve user data correctly', async () => {
             const storageAdapter = new InMemoryStorageAdapter();
-            const user: UserRecord = {
+            const user: UserClaims = {
                 sub: 'user123',
                 name: 'Test User',
                 email: 'test@example.com',
-                lastUserInfoRefresh: Date.now(),
+            };
+            const metadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(),
             };
 
-            await storageAdapter.storeUser(user, user, {});
-            const retrievedUser = await storageAdapter.findUser(
+            const result = await storageAdapter.storeUser(user, user, metadata);
+            expect(result).toEqual(user);
+
+            const retrievedResult = await storageAdapter.findUser(
                 createJwtTokenContext('user123'),
             );
 
-            expect(retrievedUser).toEqual(user);
+            expect(retrievedResult?.user).toEqual(user);
+            expect(retrievedResult?.metadata).toEqual(metadata);
         });
 
         it('should return null for non-existent users', async () => {
             const storageAdapter = new InMemoryStorageAdapter();
-            const user = await storageAdapter.findUser(
+            const userResult = await storageAdapter.findUser(
                 createJwtTokenContext('nonexistent'),
             );
-            expect(user).toBeNull();
+            expect(userResult).toBeNull();
         });
     });
 
@@ -48,23 +57,26 @@ describe('Authenticator - Component Integration and Utilities', () => {
 
     describe('Refresh Logic Integration', () => {
         it('should require refresh for users never refreshed', () => {
-            const user: UserRecord = {
+            const user: UserClaims = {
                 sub: 'user123',
                 name: 'Test User',
             };
+            const metadata: StorageMetadata = {};
 
-            expect(defaultUserInfoRefreshCondition(user)).toBe(true);
+            expect(defaultUserInfoRefreshCondition(user, metadata)).toBe(true);
         });
 
         it('should require refresh for stale user data', () => {
             const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-            const user: UserRecord = {
+            const user: UserClaims = {
                 sub: 'user123',
                 name: 'Test User',
-                lastUserInfoRefresh: twoHoursAgo,
+            };
+            const metadata: StorageMetadata = {
+                lastUserInfoRefresh: new Date(twoHoursAgo),
             };
 
-            expect(defaultUserInfoRefreshCondition(user)).toBe(true);
+            expect(defaultUserInfoRefreshCondition(user, metadata)).toBe(true);
         });
     });
 });

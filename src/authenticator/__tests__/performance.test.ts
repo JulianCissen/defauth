@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
+import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -25,8 +25,8 @@ jest.unstable_mockModule('openid-client', () => ({
 // Import modules after mocking
 const { Authenticator } = await import('../authenticator.js');
 
-// Type alias for the authenticated Authenticator with UserRecord
-type UserRecordAuthenticator = InstanceType<typeof Authenticator<UserRecord>>;
+// Type alias for the authenticated Authenticator with UserClaims
+type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -46,15 +46,15 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - Performance and API Call Optimization', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserRecord>;
+    let mockConfig: AuthenticatorConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
-        mockConfig = createMockConfig({
+        mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
             logger: mockLogger,
         });
@@ -96,7 +96,7 @@ describe('Authenticator - Performance and API Call Optimization', () => {
     });
 
     describe('API Call Limiting', () => {
-        let authenticator: UserRecordAuthenticator;
+        let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
             authenticator = new Authenticator(mockConfig);
@@ -337,10 +337,14 @@ describe('Authenticator - Performance and API Call Optimization', () => {
                 const staleUserInfoUser = {
                     sub: MOCK_USER_CLAIMS.sub,
                     name: 'Stale UserInfo User',
-                    lastUserInfoRefresh: Date.now() - 2 * 60 * 60 * 1000, // 2 hours ago
-                    lastIntrospection: Date.now() - 30 * 60 * 1000, // 30 minutes ago
                 };
-                mockStorageAdapter.setUser(staleUserInfoUser);
+                const staleMetadata = {
+                    lastUserInfoRefresh: new Date(
+                        Date.now() - 2 * 60 * 60 * 1000,
+                    ), // 2 hours ago
+                    lastIntrospection: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+                };
+                mockStorageAdapter.setUser(staleUserInfoUser, staleMetadata);
 
                 await authenticator.getUser(MOCK_JWT_TOKEN);
 

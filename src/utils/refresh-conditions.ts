@@ -1,19 +1,18 @@
-import type {
-    StorageMetadata,
-    UserInfoRefreshCondition,
-} from '../types/index.js';
+import type { StorageMetadata } from '../types/index.js';
 
 /**
  * Default condition that checks if last user info refresh was over 1 hour ago
- * @param user - The user record to check
+ * @param _user - The user record (unused in default implementation)
+ * @param metadata - The metadata to check
  * @returns true if refresh is needed
  */
-export const defaultUserInfoRefreshCondition: UserInfoRefreshCondition<
-    StorageMetadata
-> = (user: StorageMetadata): boolean => {
-    if (user.lastUserInfoRefresh) {
-        const oneHourAgo = Date.now() - 60 * 60 * 1000; // 1 hour in milliseconds
-        return user.lastUserInfoRefresh <= oneHourAgo;
+export const defaultUserInfoRefreshCondition = <TUser>(
+    _user: TUser,
+    metadata: StorageMetadata,
+): boolean => {
+    if (metadata.lastUserInfoRefresh) {
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+        return metadata.lastUserInfoRefresh <= oneHourAgo;
     }
 
     return true; // Never refreshed before

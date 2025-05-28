@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserRecord } from '../../types/index.js';
+import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -44,15 +44,15 @@ const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
 describe('Authenticator - Initialization and Configuration', () => {
-    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter>;
+    let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserRecord>;
+    let mockConfig: AuthenticatorConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockStorageAdapter = new MockStorageAdapter();
+        mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
-        mockConfig = createMockConfig({
+        mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
             logger: mockLogger,
         });
