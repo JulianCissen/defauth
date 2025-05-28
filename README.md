@@ -99,10 +99,10 @@ const auth = new Authenticator({
   throwOnUserInfoFailure: true,
   
   // Optional: Custom refresh condition
-  userInfoRefreshCondition: (user) => {
+  userInfoRefreshCondition: (user, metadata) => {
     // Refresh user info every 30 minutes instead of default 1 hour
-    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
-    return !user.lastUserInfoRefresh || user.lastUserInfoRefresh < thirtyMinutesAgo;
+    const thirtyMinutesAgo = new Date(Date.now() - (30 * 60 * 1000));
+    return !metadata.lastUserInfoRefresh || metadata.lastUserInfoRefresh <= thirtyMinutesAgo;
   }
 });
 ```
@@ -181,17 +181,40 @@ const resilientAuth = new Authenticator({
 Implement the `StorageAdapter` interface for your own storage solution:
 
 ```typescript
-import { StorageAdapter, UserRecord } from 'defauth';
+import { StorageAdapter, StorageMetadata, TokenContext, UserClaims } from 'defauth';
 
-class DatabaseStorageAdapter implements StorageAdapter {
-  async findUser(sub: string): Promise<UserRecord | null> {
+class DatabaseStorageAdapter<TUser = UserClaims> implements StorageAdapter<TUser> {
+  async findUser(context: TokenContext): Promise<{
+    user: TUser;
+    metadata: StorageMetadata;
+  } | null> {
     // Your database lookup logic
-    return await db.users.findOne({ sub });
+    const result = await db.users.findOne({ sub: context.sub });
+    if (!result) return null;
+    
+    return {
+      user: result.user,
+      metadata: result.metadata
+    };
   }
 
-  async storeUser(user: UserRecord): Promise<void> {
+  async storeUser(
+    user: TUser | null,
+    newClaims: UserClaims,
+    metadata: StorageMetadata
+  ): Promise<TUser> {
+    // Create or update user record
+    const updatedUser = user 
+      ? { ...user, ...newClaims } as TUser
+      : newClaims as unknown as TUser;
+    
     // Your database storage logic
-    await db.users.upsert({ sub: user.sub }, user);
+    await db.users.upsert(
+      { sub: newClaims.sub }, 
+      { user: updatedUser, metadata }
+    );
+    
+    return updatedUser;
   }
 }
 
@@ -215,12 +238,12 @@ const neverRefresh: UserInfoRefreshCondition = () => false;
 const alwaysRefresh: UserInfoRefreshCondition = () => true;
 
 // Custom time-based condition
-const customCondition: UserInfoRefreshCondition = (user) => {
-  if (!user.lastUserInfoRefresh) return true;
+const customCondition: UserInfoRefreshCondition = (user, metadata) => {
+  if (!metadata.lastUserInfoRefresh) return true;
   
   // Refresh every 15 minutes
-  const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-  return user.lastUserInfoRefresh < fifteenMinutesAgo;
+  const fifteenMinutesAgo = new Date(Date.now() - (15 * 60 * 1000));
+  return metadata.lastUserInfoRefresh <= fifteenMinutesAgo;
 };
 
 const auth = new Authenticator({
@@ -251,17 +274,27 @@ Clears all cached user data (useful for testing).
 #### `UserClaims`
 Standard OIDC user claims interface.
 
+#### `StorageMetadata`
+Metadata stored alongside user data in storage adapters.
+- `lastUserInfoRefresh?: Date` - Timestamp of last UserInfo endpoint refresh
+- `lastIntrospection?: Date` - Timestamp of last token introspection
+
 #### `UserRecord`
-Extended user record stored in adapters (includes `lastUserInfoRefresh` and deprecated `lastIntrospection`).
+**Deprecated**: Extended user record that combines user claims and metadata. Use separate `user` and `metadata` objects instead.
 
 #### `AuthenticatorConfig`
 Configuration object for the authenticator.
 
-#### `StorageAdapter`
-Interface for implementing custom storage solutions.
+#### `StorageAdapter<TUser>`
+Generic interface for implementing custom storage solutions. Methods:
+- `findUser(context: TokenContext): Promise<{user: TUser; metadata: StorageMetadata} | null>`
+- `storeUser(user: TUser | null, newClaims: UserClaims, metadata: StorageMetadata): Promise<TUser>`
 
-#### `UserInfoRefreshCondition`
-Function type for determining when to refresh user information from UserInfo endpoint.
+#### `TokenContext`
+Context object containing token validation information passed to storage adapters.
+
+#### `UserInfoRefreshCondition<TUser>`
+Function type `(user: TUser, metadata: StorageMetadata) => boolean` for determining when to refresh user information from UserInfo endpoint.
 
 #### `Logger`
 Interface for implementing custom logging solutions.
@@ -276,9 +309,9 @@ Deprecated alias for `UserInfoRefreshCondition`.
 
 The library exports Zod schemas for validation:
 
-- `UserClaimsSchema`: Validates user claims
-- `UserRecordSchema`: Validates user records
-- `IntrospectionResponseSchema`: Validates introspection responses
+- `UserClaimsSchema`: Validates user claims (requires only `sub` field)
+- `UserRecordSchema`: Validates deprecated user records (includes `Date` objects for timestamps)
+- `IntrospectionResponseSchema`: Validates introspection responses from OIDC providers
 
 ## Error Handling
 

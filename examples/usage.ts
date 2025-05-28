@@ -66,12 +66,12 @@ async function example() {
         storageAdapter: new InMemoryStorageAdapter(),
 
         // Optional: Custom refresh condition for UserInfo
-        userInfoRefreshCondition: (user) => {
+        userInfoRefreshCondition: (user, metadata) => {
             // Refresh UserInfo every 30 minutes instead of default 1 hour
-            if (!user.lastUserInfoRefresh) return true;
+            if (!metadata.lastUserInfoRefresh) return true;
 
-            const thirtyMinutesAgo = Date.now() - 30 * 60 * 1000;
-            return user.lastUserInfoRefresh < thirtyMinutesAgo;
+            const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+            return metadata.lastUserInfoRefresh <= thirtyMinutesAgo;
         },
     });
     
