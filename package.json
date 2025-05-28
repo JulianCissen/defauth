@@ -5,9 +5,23 @@
     "keywords": [
         "oidc",
         "openid",
-        "client",
+        "openid-connect",
+        "oauth2",
+        "jwt",
         "authentication",
-        "backend"
+        "authorization",
+        "token",
+        "security",
+        "typescript",
+        "backend",
+        "client",
+        "introspection",
+        "userinfo",
+        "middleware",
+        "express",
+        "node",
+        "spa",
+        "rest-api"
     ],
     "homepage": "https://github.com/JulianCissen/defauth",
     "bugs": "https://github.com/JulianCissen/defauth/issues",
@@ -15,7 +29,9 @@
     "license": "MIT",
     "author": "Julian Cissen",
     "files": [
-        "dist/**/*"
+        "dist/**/*",
+        "README.md",
+        "LICENSE.md"
     ],
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
