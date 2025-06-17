@@ -34,6 +34,7 @@ import type { IntrospectionResponse } from 'oauth4webapi';
  */
 export class Authenticator<TUser> {
     private clientConfig?: openid.Configuration;
+    private clientId: string;
     private storageAdapter: StorageAdapter<TUser>;
     private userInfoRefreshCondition: UserInfoRefreshCondition<TUser>;
     private userInfoStrategy: UserInfoStrategy;
@@ -66,6 +67,7 @@ export class Authenticator<TUser> {
      * @param config - Configuration options for the authenticator
      */
     constructor(config: AuthenticatorConfig<TUser>) {
+        this.clientId = config.clientId;
         this.storageAdapter =
             config.storageAdapter || new InMemoryStorageAdapter<TUser>();
         this.userInfoRefreshCondition =
@@ -384,7 +386,10 @@ export class Authenticator<TUser> {
                 requiredClaims: options?.requiredClaims,
             };
 
-            return await jose.jwtVerify(token, jwks, jwtVerifyOptions);
+            return await jose.jwtVerify(token, jwks, {
+                ...jwtVerifyOptions,
+                audience: this.clientId,
+            });
         } catch (error) {
             throw new JwtVerificationError(
                 'JWT signature verification failed',
