@@ -58,18 +58,3 @@ jobs:
       run: npm publish --provenance --access public
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    
-    - name: Create GitHub release (if triggered by workflow_dispatch)
-      if: github.event_name == 'workflow_dispatch' && steps.check-version.outputs.version-exists == 'false'
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.check-version.outputs.version }}
-        release_name: Release v${{ steps.check-version.outputs.version }}
-        body: |
-          Release v${{ steps.check-version.outputs.version }}
-          
-          Published to NPM: https://www.npmjs.com/package/defauth/v/${{ steps.check-version.outputs.version }}
-        draft: false
-        prerelease: false
