@@ -38,7 +38,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -99,8 +98,7 @@ describe('Authenticator - Performance and API Call Optimization', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         describe('Token Introspection Call Limiting', () => {

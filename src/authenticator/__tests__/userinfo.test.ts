@@ -42,7 +42,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -103,8 +102,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should fetch UserInfo for new users', async () => {
@@ -145,8 +143,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
             const userInfoError = new Error('UserInfo failed');
             openidMock.fetchUserInfo.mockRejectedValue(userInfoError);
 
-            const authenticator = new Authenticator(config);
-            await waitForAsync();
+            const authenticator = await Authenticator.create(config);
 
             await expect(authenticator.getUser(MOCK_JWT_TOKEN)).rejects.toThrow(
                 'Failed to fetch UserInfo',
@@ -158,8 +155,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         describe('afterUserRetrieval (default strategy)', () => {
@@ -193,7 +189,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
 
             it('should respect userInfoRefreshCondition in afterUserRetrieval strategy', async () => {
                 const customCondition = jest.fn().mockReturnValue(false);
-                const authenticatorWithCondition = new Authenticator({
+                const authenticatorWithCondition = await Authenticator.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -217,8 +213,8 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         describe('beforeUserRetrieval strategy', () => {
             let beforeRetrievalAuthenticator: UserClaimsAuthenticator;
 
-            beforeEach(() => {
-                beforeRetrievalAuthenticator = new Authenticator({
+            beforeEach(async () => {
+                beforeRetrievalAuthenticator = await Authenticator.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -279,7 +275,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
 
             it('should always fetch UserInfo in beforeUserRetrieval strategy (condition ignored)', async () => {
                 const mockCondition = jest.fn().mockReturnValue(false);
-                const conditionalAuthenticator = new Authenticator({
+                const conditionalAuthenticator = await Authenticator.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -367,8 +363,8 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         });
 
         describe('Configuration', () => {
-            it('should default to afterUserRetrieval strategy when not specified', () => {
-                const defaultAuthenticator = new Authenticator({
+            it('should default to afterUserRetrieval strategy when not specified', async () => {
+                const defaultAuthenticator = await Authenticator.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -380,8 +376,8 @@ describe('Authenticator - UserInfo Integration and Management', () => {
                 );
             });
 
-            it('should accept beforeUserRetrieval strategy in configuration', () => {
-                const beforeAuthenticator = new Authenticator({
+            it('should accept beforeUserRetrieval strategy in configuration', async () => {
+                const beforeAuthenticator = await Authenticator.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,

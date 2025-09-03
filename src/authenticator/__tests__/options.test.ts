@@ -37,7 +37,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -102,8 +101,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
                     clockTolerance: '2 minutes',
                 },
             });
-            authenticator = new Authenticator(configWithJwtOptions);
-            await waitForAsync();
+            authenticator = await Authenticator.create(configWithJwtOptions);
         });
 
         it('should use global JWT validation options by default', async () => {
@@ -280,8 +278,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
                 storageAdapter: mockStorageAdapter,
                 logger: mockLogger,
             });
-            defaultAuthenticator = new Authenticator(defaultConfig);
-            await waitForAsync();
+            defaultAuthenticator = await Authenticator.create(defaultConfig);
         });
 
         it('should use default JWT validation options when none are provided', async () => {

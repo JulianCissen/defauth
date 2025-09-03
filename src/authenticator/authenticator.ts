@@ -41,9 +41,7 @@ export class Authenticator<TUser> {
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
     private globalJwtValidationOptions: JwtValidationOptions;
-    private isInitialized = false;
-    private initializationError?: Error;
-    private initializationPromise: Promise<void>;
+    private initializationConfig?: AuthenticatorConfig<TUser>;
 
     private static readonly JWT_METADATA_CLAIMS = [
         'client_id',
@@ -63,11 +61,30 @@ export class Authenticator<TUser> {
     ] as const;
 
     /**
+     * Creates and initializes an Authenticator instance asynchronously
+     * @param config - Configuration options for the authenticator
+     * @returns Promise resolving to a fully initialized Authenticator instance
+     * @throws InitializationError if OIDC client initialization fails
+     */
+    static async create<TUser>(
+        config: AuthenticatorConfig<TUser>,
+    ): Promise<Authenticator<TUser>> {
+        const authenticator = new Authenticator(config);
+        await authenticator.initializeClient(config);
+        return authenticator;
+    }
+
+    /**
      * Creates an instance of the Authenticator
      * @param config - Configuration options for the authenticator
+     * @deprecated Use Authenticator.create() instead. The constructor does not initialize the OIDC client
+     * and will require manual initialization. This constructor will be removed in a future version.
+     * @internal This constructor is primarily for internal use by the static create method.
      */
     constructor(config: AuthenticatorConfig<TUser>) {
+        // WARNING: Constructor is deprecated - use Authenticator.create() instead
         this.clientId = config.clientId;
+        this.initializationConfig = config;
         this.storageAdapter =
             config.storageAdapter || new InMemoryStorageAdapter<TUser>();
         this.userInfoRefreshCondition =
@@ -79,20 +96,6 @@ export class Authenticator<TUser> {
             requiredClaims: ['sub', 'exp'],
             clockTolerance: '1 minute',
         };
-
-        // Create initialization promise that always resolves (errors stored in initializationError)
-        this.initializationPromise = this.initializeClient(config).catch(
-            (error) => {
-                this.initializationError = new InitializationError(
-                    'Failed to initialize OIDC client',
-                    error as Error,
-                );
-                this.logger.log('error', 'OIDC client initialization failed', {
-                    error: error.message,
-                });
-                // Don't re-throw - let the promise resolve so ensureInitialized can handle the error
-            },
-        );
     }
 
     /**
@@ -143,7 +146,6 @@ export class Authenticator<TUser> {
                 config.clientId,
                 config.clientSecret,
             );
-            this.isInitialized = true;
         } catch (error) {
             throw new InitializationError(
                 'Failed to discover OIDC issuer or create client',
@@ -164,17 +166,16 @@ export class Authenticator<TUser> {
     }
 
     /**
-     * Ensure client is initialized
-     * @returns Promise that resolves when client is ready or rejects if initialization failed
+     * Ensure client is initialized, initialize lazily if needed
+     * @throws Error if client initialization fails
      */
     private async ensureInitialized(): Promise<void> {
-        await this.initializationPromise;
-
-        if (this.initializationError) {
-            throw this.initializationError;
+        if (!this.clientConfig && this.initializationConfig) {
+            await this.initializeClient(this.initializationConfig);
         }
-        if (!this.isInitialized || !this.clientConfig) {
-            throw new Error('OIDC client is not initialized yet');
+        
+        if (!this.clientConfig) {
+            throw new Error('OIDC client is not initialized. Use Authenticator.create() for proper initialization.');
         }
     }
 

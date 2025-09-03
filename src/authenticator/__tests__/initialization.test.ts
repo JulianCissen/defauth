@@ -30,13 +30,11 @@ const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
     MOCK_USERINFO_RESPONSE,
-    MOCK_USER_CLAIMS,
     MockLogger,
     MockStorageAdapter,
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -93,84 +91,57 @@ describe('Authenticator - Initialization and Configuration', () => {
         jest.restoreAllMocks();
     });
 
-    describe('Constructor and Initialization', () => {
-        it('should create authenticator with default configuration', async () => {
+    describe('Static Create Method and Initialization', () => {
+        it('should create authenticator with default configuration using static method', async () => {
             const config = createMockConfig();
-            const authenticator = new Authenticator(config);
+            const authenticator = await Authenticator.create(config);
 
-            // Wait for async initialization
-            await waitForAsync();
-
-            // Verify authenticator was created successfully
             expect(authenticator).toBeDefined();
             expect(openidMock.discovery).toHaveBeenCalledWith(
                 new URL(config.issuer),
                 config.clientId,
                 config.clientSecret,
             );
+
+            // Should be ready to use immediately
+            const result = await authenticator.getUser(MOCK_JWT_TOKEN);
+            expect(result).toBeDefined();
         });
 
-        it('should use provided storage adapter', () => {
-            const customAdapter = new InMemoryStorageAdapter();
-            const config = createMockConfig({ storageAdapter: customAdapter });
+        it('should create authenticator using static create method', async () => {
+            const config = createMockConfig();
+            const authenticator = await Authenticator.create(config);
 
-            new Authenticator(config);
+            // Verify authenticator was created successfully and is ready
+            expect(authenticator).toBeDefined();
+            expect(openidMock.discovery).toHaveBeenCalledWith(
+                new URL(config.issuer),
+                config.clientId,
+                config.clientSecret,
+            );
 
-            // The authenticator should use the provided adapter
-            expect(config.storageAdapter).toBe(customAdapter);
+            // Should be able to call getUser immediately without race conditions
+            const result = await authenticator.getUser(MOCK_JWT_TOKEN);
+            expect(result).toBeDefined();
         });
 
-        it('should handle OIDC discovery failure', async () => {
+        it('should throw InitializationError from static create method on discovery failure', async () => {
             const discoveryError = new Error('Discovery failed');
             openidMock.discovery.mockRejectedValue(discoveryError);
 
-            const authenticator = new Authenticator(mockConfig);
-
-            // Wait for initialization to complete (or fail)
-            await waitForAsync();
-
-            // The authenticator should throw the specific initialization error
-            await expect(authenticator.getUser(MOCK_JWT_TOKEN)).rejects.toThrow(
-                'Failed to initialize OIDC client: Failed to discover OIDC issuer or create client: Discovery failed',
+            await expect(Authenticator.create(mockConfig)).rejects.toThrow(
+                'Failed to discover OIDC issuer or create client: Discovery failed',
             );
         });
 
-        it('should handle getUser called immediately during initialization (race condition)', async () => {
-            // Set up a slower initialization to simulate race condition
-            let resolveDiscovery: (value: any) => void = () => {};
-            const discoveryPromise = new Promise((resolve) => {
-                resolveDiscovery = resolve;
-            });
-            openidMock.discovery.mockReturnValue(discoveryPromise as never);
+        it('should use provided storage adapter with static create method', async () => {
+            const customAdapter = new InMemoryStorageAdapter();
+            const config = createMockConfig({ storageAdapter: customAdapter });
 
-            // Create authenticator (initialization starts immediately)
-            const authenticator = new Authenticator(mockConfig);
+            const authenticator = await Authenticator.create(config);
 
-            // Call getUser immediately without waiting for initialization
-            // This should wait for initialization to complete, not throw an error
-            const getUserPromise = authenticator.getUser(MOCK_JWT_TOKEN);
-
-            // Complete the initialization
-            resolveDiscovery(createMockOpenidClient());
-
-            // getUser should now succeed after waiting for initialization
-            const result = await getUserPromise;
-
-            expect(result).toEqual(
-                expect.objectContaining({
-                    sub: MOCK_USER_CLAIMS.sub,
-                    name: expect.any(String),
-                    email: expect.any(String),
-                }),
-            );
-            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
-                MOCK_JWT_TOKEN,
-                expect.any(Function),
-                expect.objectContaining({
-                    clockTolerance: '1 minute',
-                    requiredClaims: ['sub', 'exp'],
-                }),
-            );
+            expect(authenticator).toBeDefined();
+            expect(config.storageAdapter).toBe(customAdapter);
         });
     });
 });

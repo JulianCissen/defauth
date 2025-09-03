@@ -43,7 +43,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -104,8 +103,7 @@ describe('Authenticator - Storage and Caching', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should store user data after successful processing', async () => {
@@ -215,8 +213,7 @@ describe('Authenticator - Storage and Caching', () => {
             const inMemoryConfig = createMockConfig({
                 storageAdapter: new InMemoryStorageAdapter(),
             });
-            const inMemoryAuthenticator = new Authenticator(inMemoryConfig);
-            await waitForAsync();
+            const inMemoryAuthenticator = await Authenticator.create(inMemoryConfig);
 
             // Store some data
             await inMemoryAuthenticator.getUser(MOCK_JWT_TOKEN);

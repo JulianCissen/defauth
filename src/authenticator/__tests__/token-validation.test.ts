@@ -39,7 +39,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -100,8 +99,7 @@ describe('Authenticator - Token Validation and Processing', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync(); // Wait for initialization
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should throw error for empty token', async () => {
@@ -120,15 +118,10 @@ describe('Authenticator - Token Validation and Processing', () => {
             // Mock a failed initialization
             openidMock.discovery.mockRejectedValue(new Error('Init failed'));
 
-            const failedAuthenticator = new Authenticator(mockConfig);
-
-            // Wait for the async initialization to fail
-            await waitForAsync();
-
             await expect(
-                failedAuthenticator.getUser(MOCK_JWT_TOKEN),
+                Authenticator.create(mockConfig),
             ).rejects.toThrow(
-                'Failed to initialize OIDC client: Failed to discover OIDC issuer or create client: Init failed',
+                'Failed to discover OIDC issuer or create client: Init failed',
             );
         });
     });
@@ -137,8 +130,7 @@ describe('Authenticator - Token Validation and Processing', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should successfully process valid JWT token', async () => {
@@ -196,8 +188,7 @@ describe('Authenticator - Token Validation and Processing', () => {
                 mockClientWithoutJwks as any,
             );
 
-            const authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            const authenticator = await Authenticator.create(mockConfig);
 
             const result = await authenticator.getUser(MOCK_JWT_TOKEN);
 
@@ -214,8 +205,7 @@ describe('Authenticator - Token Validation and Processing', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should successfully process valid opaque token', async () => {

@@ -1,6 +1,6 @@
 {
     "name": "defauth",
-    "version": "1.4.1",
+    "version": "2.0.0",
     "description": "A TypeScript OIDC authentication library with support for JWT and opaque tokens",
     "keywords": [
         "oidc",

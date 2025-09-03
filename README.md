@@ -13,6 +13,45 @@ A TypeScript library for handling OIDC authentication with support for both JWT 
 - 🔒 **Validation**: Robust input validation using Zod
 - 📝 **TypeScript**: Full TypeScript support with comprehensive type definitions
 
+## Migration Guide (v2.0)
+
+### Breaking Changes
+
+**Constructor Deprecation**: The `new Authenticator()` constructor is deprecated and will be removed in the next major version.
+
+#### Before (v1.x)
+```typescript
+// ❌ Old way - will be removed
+const auth = new Authenticator({
+  issuer: 'https://example.com',
+  clientId: 'client-id',
+  clientSecret: 'client-secret'
+});
+
+// Had to wait for async initialization or handle race conditions
+const user = await auth.getUser(token);
+```
+
+#### After (v2.0+)
+```typescript
+// ✅ New way - recommended
+const auth = await Authenticator.create({
+  issuer: 'https://example.com',
+  clientId: 'client-id',
+  clientSecret: 'client-secret'
+});
+
+// Ready to use immediately, no race conditions
+const user = await auth.getUser(token);
+```
+
+### Benefits of Migration
+
+- **Explicit initialization**: Clear error handling during setup
+- **No race conditions**: Guaranteed ready state after Promise resolves
+- **Better error messages**: Clearer failure modes during initialization
+- **Modern API**: Consistent with Promise-based patterns
+
 ## Installation
 
 ```bash
@@ -24,8 +63,8 @@ npm install defauth
 ```typescript
 import { Authenticator } from 'defauth';
 
-// For confidential clients (with client secret)
-const auth = new Authenticator({
+// Create and initialize an authenticator (recommended approach)
+const auth = await Authenticator.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret' // Optional for public clients
@@ -40,6 +79,8 @@ const validatedUser = await auth.getUser(token, { forceIntrospection: true });
 console.log(user.sub, user.email, user.name);
 ```
 
+> **Breaking Change Notice**: The constructor approach (`new Authenticator()`) is deprecated and will be removed in a future version. Always use `Authenticator.create()` for proper initialization.
+
 ## Configuration
 
 ### Basic Configuration
@@ -47,7 +88,7 @@ console.log(user.sub, user.email, user.name);
 #### Confidential Client (with client secret)
 
 ```typescript
-const auth = new Authenticator({
+const auth = await Authenticator.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret'
@@ -57,12 +98,42 @@ const auth = new Authenticator({
 #### Public Client (without client secret)
 
 ```typescript
-const auth = new Authenticator({
+const auth = await Authenticator.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-public-client-id'
   // No client secret needed for public clients like SPAs or mobile apps
 });
 ```
+
+### Initialization
+
+The `Authenticator.create()` static method is the **only recommended way** to create an Authenticator instance. It returns a Promise that resolves with a fully initialized Authenticator:
+
+```typescript
+try {
+  const auth = await Authenticator.create({
+    issuer: 'https://your-oidc-provider.com',
+    clientId: 'your-client-id',
+    clientSecret: 'your-client-secret'
+  });
+  
+  // Authenticator is guaranteed to be fully initialized and ready to use
+  const user = await auth.getUser(token);
+  console.log('User:', user);
+} catch (error) {
+  // Handle initialization failures explicitly
+  console.error('Failed to initialize authenticator:', error.message);
+}
+```
+
+**Key benefits of `Authenticator.create()`:**
+- ✅ Explicit error handling during initialization
+- ✅ No race conditions when calling `getUser()` immediately
+- ✅ Promise-based API consistent with modern JavaScript patterns
+- ✅ Clear initialization lifecycle
+- ✅ Built-in validation of OIDC configuration
+
+> **⚠️ Constructor Deprecation**: The `new Authenticator()` constructor is deprecated and will be removed in the next major version. It does not properly initialize the OIDC client and can lead to runtime errors. All code should migrate to using `Authenticator.create()`.
 
 ### Advanced Configuration
 
@@ -84,7 +155,7 @@ class CustomLogger implements Logger {
   }
 }
 
-const auth = new Authenticator({
+const auth = await Authenticator.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret',

@@ -39,7 +39,6 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    waitForAsync,
 } = await import('./test-utils.js');
 
 // Get mocked modules
@@ -100,8 +99,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         describe('General Error Handling', () => {
@@ -129,30 +127,28 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
         describe('Client Initialization Errors', () => {
             it('should throw error when client config missing during JWT verification', async () => {
                 // Create authenticator that will have no clientConfig
-                const brokenAuthenticator = new Authenticator(mockConfig);
-                // Wait for initialization to complete first
-                await waitForAsync();
-
-                // Now force the broken state
+                const brokenAuthenticator = await Authenticator.create(mockConfig);
+                
+                // Now force the broken state and remove initialization config
                 (brokenAuthenticator as any).clientConfig = undefined;
+                (brokenAuthenticator as any).initializationConfig = undefined;
 
                 await expect(
                     brokenAuthenticator.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('OIDC client is not initialized yet');
+                ).rejects.toThrow('OIDC client is not initialized');
             });
 
             it('should throw error when client config missing during token introspection', async () => {
                 // Create authenticator and force missing clientConfig during introspection
-                const brokenAuthenticator = new Authenticator(mockConfig);
-                // Wait for initialization to complete first
-                await waitForAsync();
-
-                // Now force the broken state
+                const brokenAuthenticator = await Authenticator.create(mockConfig);
+                
+                // Now force the broken state and remove initialization config
                 (brokenAuthenticator as any).clientConfig = undefined;
+                (brokenAuthenticator as any).initializationConfig = undefined;
 
                 await expect(
                     brokenAuthenticator.getUser(MOCK_OPAQUE_TOKEN),
-                ).rejects.toThrow('OIDC client is not initialized yet');
+                ).rejects.toThrow('OIDC client is not initialized');
             });
 
             it('should throw error when client config missing during UserInfo fetch', async () => {
@@ -168,15 +164,15 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                 };
                 mockStorageAdapter.setUser(existingUser, existingMetadata);
 
-                const brokenAuthenticator = new Authenticator(mockConfig);
-                await waitForAsync();
+                const brokenAuthenticator = await Authenticator.create(mockConfig);
 
-                // Force clientConfig to be undefined after initialization
+                // Force clientConfig to be undefined after initialization and remove fallback
                 (brokenAuthenticator as any).clientConfig = undefined;
+                (brokenAuthenticator as any).initializationConfig = undefined;
 
                 await expect(
                     brokenAuthenticator.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('OIDC client is not initialized yet');
+                ).rejects.toThrow('OIDC client is not initialized');
             });
 
             it('should throw error when initial discovery fails for token introspection', async () => {
@@ -185,13 +181,9 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     new Error('Discovery failed'),
                 );
 
-                const authenticator = new Authenticator(mockConfig);
-                await waitForAsync(); // Let initialization fail
-
-                // Try to get user with opaque token (which requires introspection)
                 await expect(
-                    authenticator.getUser(MOCK_OPAQUE_TOKEN),
-                ).rejects.toThrow('Failed to initialize OIDC client');
+                    Authenticator.create(mockConfig),
+                ).rejects.toThrow('Failed to discover OIDC issuer or create client: Discovery failed');
             });
 
             it('should throw error when initial discovery fails for UserInfo fetch', async () => {
@@ -200,33 +192,10 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     new Error('Discovery failed'),
                 );
 
-                const authenticator = new Authenticator(mockConfig);
-                await waitForAsync(); // Let initialization fail
-
-                // Set up a user that needs UserInfo refresh
-                const staleUser = {
-                    sub: MOCK_USER_CLAIMS.sub,
-                    name: 'Stale User',
-                };
-                const staleMetadata = {
-                    lastUserInfoRefresh: new Date(
-                        Date.now() - 25 * 60 * 60 * 1000,
-                    ), // 25 hours ago, beyond refresh threshold
-                };
-                mockStorageAdapter.setUser(staleUser, staleMetadata);
-
-                // Mock JWT verification to bypass token validation
-                joseMock.jwtVerify.mockResolvedValue(
-                    createMockJwtVerifyResult() as never,
-                );
-
-                // Attempt to get user - this should trigger UserInfo refresh attempt
                 await expect(
-                    authenticator.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('Failed to initialize OIDC client');
-            });
-
-            it('should log warning when UserInfo endpoint is missing from server metadata', async () => {
+                    Authenticator.create(mockConfig),
+                ).rejects.toThrow('Failed to discover OIDC issuer or create client: Discovery failed');
+            });            it('should log warning when UserInfo endpoint is missing from server metadata', async () => {
                 const mockClientNoUserInfo = {
                     serverMetadata: jest.fn().mockReturnValue({
                         jwks_uri: 'https://example.com/.well-known/jwks.json',
@@ -237,8 +206,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     mockClientNoUserInfo as any,
                 );
 
-                const noUserInfoAuth = new Authenticator(mockConfig);
-                await waitForAsync();
+                const noUserInfoAuth = await Authenticator.create(mockConfig);
 
                 // Force UserInfo refresh by having old timestamp
                 const existingUser = {
@@ -281,8 +249,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     mockClientNoUserInfo as any,
                 );
 
-                const noUserInfoAuth = new Authenticator(throwConfig);
-                await waitForAsync();
+                const noUserInfoAuth = await Authenticator.create(throwConfig);
 
                 // Force UserInfo refresh by having old timestamp
                 const existingUser = {
@@ -387,8 +354,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     throwOnUserInfoFailure: true,
                 });
 
-                const throwAuth = new Authenticator(throwConfig);
-                await waitForAsync();
+                const throwAuth = await Authenticator.create(throwConfig);
 
                 // Set up existing user record
                 const existingUser = {
@@ -441,10 +407,9 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
                     userInfoRefreshCondition: () => true,
                 });
 
-                const alwaysRefreshAuth = new Authenticator(
+                const alwaysRefreshAuth = await Authenticator.create(
                     alwaysRefreshConfig,
                 );
-                await waitForAsync();
 
                 const recentUser = {
                     sub: MOCK_USER_CLAIMS.sub,
@@ -460,8 +425,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
             });
 
             it('should skip UserInfo refresh when refresh is not needed', async () => {
-                const authenticator = new Authenticator(mockConfig);
-                await waitForAsync(); // Wait for initialization
+                const authenticator = await Authenticator.create(mockConfig);
 
                 // Set up a user that does NOT need UserInfo refresh (recent refresh)
                 const freshUser = {
@@ -497,8 +461,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
             });
 
             it('should preserve timestamps when UserInfo refresh is not needed', async () => {
-                const authenticator = new Authenticator(mockConfig);
-                await waitForAsync(); // Wait for initialization
+                const authenticator = await Authenticator.create(mockConfig);
 
                 // Set up a user that does NOT need UserInfo refresh due to very recent refresh
                 const recentUser = {
@@ -581,33 +544,27 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
         });
 
         describe('Initialization Edge Cases', () => {
-            it('should reject requests when OIDC client is not initialized', async () => {
-                // Mock discovery to fail so initialization will fail
+            it('should fail to create authenticator when OIDC discovery fails', async () => {
+                // Mock discovery to fail
                 openidMock.discovery.mockRejectedValue(
                     new Error('Discovery failed'),
                 );
 
-                const uninitializedAuth = new Authenticator(mockConfig);
-                // Wait for initialization to fail
-                await waitForAsync();
-
                 await expect(
-                    uninitializedAuth.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('Failed to initialize OIDC client');
+                    Authenticator.create(mockConfig),
+                ).rejects.toThrow('Failed to discover OIDC issuer or create client: Discovery failed');
             });
 
-            it('should reject requests when client is in partially initialized state', async () => {
-                const partialAuth = new Authenticator(mockConfig);
-                // Wait for initialization to complete first
-                await waitForAsync();
+            it('should reject requests when client config is manually corrupted', async () => {
+                const authenticator = await Authenticator.create(mockConfig);
 
                 // Force partial initialization state after successful init
-                (partialAuth as any).isInitialized = true;
-                (partialAuth as any).clientConfig = null;
+                (authenticator as any).clientConfig = null;
+                (authenticator as any).initializationConfig = null;
 
                 await expect(
-                    partialAuth.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('OIDC client is not initialized yet');
+                    authenticator.getUser(MOCK_JWT_TOKEN),
+                ).rejects.toThrow('OIDC client is not initialized');
             });
 
             it('should continue with token claims when UserInfo fails for opaque tokens', async () => {
@@ -654,8 +611,7 @@ describe('Authenticator - Error Handling and Edge Cases', () => {
         let authenticator: UserClaimsAuthenticator;
 
         beforeEach(async () => {
-            authenticator = new Authenticator(mockConfig);
-            await waitForAsync();
+            authenticator = await Authenticator.create(mockConfig);
         });
 
         it('should handle tokens with empty claims', async () => {

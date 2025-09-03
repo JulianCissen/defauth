@@ -28,8 +28,9 @@ class CustomLogger implements Logger {
  * Example demonstrating DefAuth's hybrid approach with UserInfo and token introspection
  */
 async function example() {
-    // Example 1: Initialize with custom logger and throw on UserInfo failure
-    const authWithCustomLogger = new Authenticator({
+    // Example 1: Initialize using the static create method (recommended approach)
+    // This ensures the authenticator is fully initialized before use
+    const authWithCustomLogger = await Authenticator.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret',
@@ -43,8 +44,8 @@ async function example() {
         storageAdapter: new InMemoryStorageAdapter(),
     });
 
-    // Example 2: Initialize with default console logger but don't throw on UserInfo failure
-    const authWithConsoleLogger = new Authenticator({
+    // Example 2: Initialize with default console logger using the static create method
+    const authWithConsoleLogger = await Authenticator.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret',
@@ -56,8 +57,8 @@ async function example() {
         throwOnUserInfoFailure: false,
     });
 
-    // Example 3: Initialize the authenticator with a client secret (confidential client)
-    const authWithSecret = new Authenticator({
+    // Example 3: Advanced configuration with custom refresh conditions
+    const authWithCustomRefresh = await Authenticator.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret', // Provided for confidential clients
@@ -75,8 +76,8 @@ async function example() {
         },
     });
     
-    // Example 4: Initialize the authenticator without a client secret (public client)
-    const publicClientAuth = new Authenticator({
+    // Example 4: Public client configuration
+    const publicClientAuth = await Authenticator.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-public-client-id',
         // No clientSecret needed for public clients (SPAs, mobile apps, etc.)
@@ -92,29 +93,29 @@ async function example() {
 
     try {
         // Standard JWT token validation (signature verification + UserInfo)
-        const userFromJwt = await authWithSecret.getUser(jwtToken);
+        const userFromJwt = await authWithCustomRefresh.getUser(jwtToken);
         console.log('User from JWT (standard validation):', {
-            sub: userFromJwt.sub,
-            email: userFromJwt.email,
-            name: userFromJwt.name,
+            sub: (userFromJwt as any).sub,
+            email: (userFromJwt as any).email,
+            name: (userFromJwt as any).name,
         });
 
         // JWT token with forced introspection (for high-security scenarios)
-        const userFromJwtWithIntrospection = await authWithSecret.getUser(jwtToken, { 
+        const userFromJwtWithIntrospection = await authWithCustomRefresh.getUser(jwtToken, { 
             forceIntrospection: true 
         });
         console.log('User from JWT with forced introspection:', {
-            sub: userFromJwtWithIntrospection.sub,
-            email: userFromJwtWithIntrospection.email,
-            name: userFromJwtWithIntrospection.name,
+            sub: (userFromJwtWithIntrospection as any).sub,
+            email: (userFromJwtWithIntrospection as any).email,
+            name: (userFromJwtWithIntrospection as any).name,
         });
 
         // Get user from opaque token (always introspected + UserInfo when available)
         const userFromOpaque = await publicClientAuth.getUser(opaqueToken);
         console.log('User from opaque token:', {
-            sub: userFromOpaque.sub,
-            email: userFromOpaque.email,
-            name: userFromOpaque.name,
+            sub: (userFromOpaque as any).sub,
+            email: (userFromOpaque as any).email,
+            name: (userFromOpaque as any).name,
         });
     } catch (error) {
         // Example of structured error handling with custom error classes
