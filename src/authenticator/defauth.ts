@@ -5,16 +5,6 @@ import {
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
-import {
-    DefauthError,
-    InitializationError,
-    IntrospectionError,
-    JwtVerificationError,
-    TokenType,
-    TokenValidationError,
-    UserClaimsSchema,
-    UserInfoError,
-} from '../types/index.js';
 import type {
     DefauthConfig,
     JwtValidationOptions,
@@ -25,6 +15,16 @@ import type {
     UserClaims,
     UserInfoRefreshCondition,
     UserInfoStrategy,
+} from '../types/index.js';
+import {
+    DefauthError,
+    InitializationError,
+    IntrospectionError,
+    JwtVerificationError,
+    TokenType,
+    TokenValidationError,
+    UserClaimsSchema,
+    UserInfoError,
 } from '../types/index.js';
 import { InMemoryStorageAdapter } from '../storage/index.js';
 import type { IntrospectionResponse } from 'oauth4webapi';
@@ -77,7 +77,7 @@ export class Defauth<TUser> {
     /**
      * Creates a new Defauth instance
      * @param config - Configuration options for the authenticator
-     * @internal Private constructor - use Defauth.create() for proper initialization
+     * @internal
      */
     private constructor(config: DefauthConfig<TUser>) {
         this.clientId = config.clientId;
@@ -368,7 +368,9 @@ export class Defauth<TUser> {
         options?: JwtValidationOptions,
     ): Promise<jose.JWTVerifyResult> {
         if (!this.clientConfig) {
-            throw new InitializationError('OIDC client configuration is not initialized');
+            throw new InitializationError(
+                'OIDC client configuration is not initialized',
+            );
         }
 
         try {
@@ -376,7 +378,9 @@ export class Defauth<TUser> {
             const jwksUri = metadata['jwks_uri'] as string;
 
             if (!jwksUri) {
-                throw new JwtVerificationError('No JWKS URI found in server metadata');
+                throw new JwtVerificationError(
+                    'No JWKS URI found in server metadata',
+                );
             }
 
             const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
@@ -490,7 +494,9 @@ export class Defauth<TUser> {
         token: string,
     ): Promise<IntrospectionResponse> {
         if (!this.clientConfig) {
-            throw new InitializationError('OIDC client configuration is not initialized');
+            throw new InitializationError(
+                'OIDC client configuration is not initialized',
+            );
         }
 
         try {
@@ -531,7 +537,9 @@ export class Defauth<TUser> {
         expectedSubject: string,
     ): Promise<UserClaims> {
         if (!this.clientConfig) {
-            throw new InitializationError('OIDC client configuration is not initialized');
+            throw new InitializationError(
+                'OIDC client configuration is not initialized',
+            );
         }
 
         try {
