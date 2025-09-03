@@ -1,5 +1,5 @@
 import type {
-    AuthenticatorConfig,
+    DefauthConfig,
     IntrospectionResponse,
     Logger,
     StorageAdapter,
@@ -196,8 +196,8 @@ export class MockLogger implements Logger {
  * @returns Mock authenticator configuration
  */
 export const createMockConfig = <TUser = UserClaims>(
-    overrides: Partial<AuthenticatorConfig<TUser>> = {},
-): AuthenticatorConfig<TUser> => ({
+    overrides: Partial<DefauthConfig<TUser>> = {},
+): DefauthConfig<TUser> => ({
     issuer: MOCK_ISSUER,
     clientId: MOCK_CLIENT_ID,
     clientSecret: MOCK_CLIENT_SECRET,

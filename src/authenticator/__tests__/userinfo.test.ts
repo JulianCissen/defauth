@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
+import type { DefauthConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -23,10 +23,10 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 
-// Type alias for the authenticated Authenticator with UserClaims
-type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_CLIENT_ID,
     MOCK_CLIENT_SECRET,
@@ -48,10 +48,10 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - UserInfo Integration and Management', () => {
+describe('Defauth - UserInfo Integration and Management', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserClaims>;
+    let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -99,10 +99,10 @@ describe('Authenticator - UserInfo Integration and Management', () => {
     });
 
     describe('UserInfo Integration', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         it('should fetch UserInfo for new users', async () => {
@@ -143,7 +143,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
             const userInfoError = new Error('UserInfo failed');
             openidMock.fetchUserInfo.mockRejectedValue(userInfoError);
 
-            const authenticator = await Authenticator.create(config);
+            const authenticator = await Defauth.create(config);
 
             await expect(authenticator.getUser(MOCK_JWT_TOKEN)).rejects.toThrow(
                 'Failed to fetch UserInfo',
@@ -152,10 +152,10 @@ describe('Authenticator - UserInfo Integration and Management', () => {
     });
 
     describe('UserInfo Strategy', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         describe('afterUserRetrieval (default strategy)', () => {
@@ -189,7 +189,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
 
             it('should respect userInfoRefreshCondition in afterUserRetrieval strategy', async () => {
                 const customCondition = jest.fn().mockReturnValue(false);
-                const authenticatorWithCondition = await Authenticator.create({
+                const authenticatorWithCondition = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -211,10 +211,10 @@ describe('Authenticator - UserInfo Integration and Management', () => {
         });
 
         describe('beforeUserRetrieval strategy', () => {
-            let beforeRetrievalAuthenticator: UserClaimsAuthenticator;
+            let beforeRetrievalAuthenticator: UserClaimsDefauth;
 
             beforeEach(async () => {
-                beforeRetrievalAuthenticator = await Authenticator.create({
+                beforeRetrievalAuthenticator = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -275,7 +275,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
 
             it('should always fetch UserInfo in beforeUserRetrieval strategy (condition ignored)', async () => {
                 const mockCondition = jest.fn().mockReturnValue(false);
-                const conditionalAuthenticator = await Authenticator.create({
+                const conditionalAuthenticator = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -364,7 +364,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
 
         describe('Configuration', () => {
             it('should default to afterUserRetrieval strategy when not specified', async () => {
-                const defaultAuthenticator = await Authenticator.create({
+                const defaultAuthenticator = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,
@@ -377,7 +377,7 @@ describe('Authenticator - UserInfo Integration and Management', () => {
             });
 
             it('should accept beforeUserRetrieval strategy in configuration', async () => {
-                const beforeAuthenticator = await Authenticator.create({
+                const beforeAuthenticator = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
                     clientSecret: MOCK_CLIENT_SECRET,

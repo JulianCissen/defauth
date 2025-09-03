@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
+import type { DefauthConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -23,10 +23,10 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 
-// Type alias for the authenticated Authenticator with UserClaims
-type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_INTROSPECTION_INACTIVE,
@@ -45,10 +45,10 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - Token Validation and Processing', () => {
+describe('Defauth - Token Validation and Processing', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserClaims>;
+    let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -96,10 +96,10 @@ describe('Authenticator - Token Validation and Processing', () => {
     });
 
     describe('Token Validation', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         it('should throw error for empty token', async () => {
@@ -118,19 +118,17 @@ describe('Authenticator - Token Validation and Processing', () => {
             // Mock a failed initialization
             openidMock.discovery.mockRejectedValue(new Error('Init failed'));
 
-            await expect(
-                Authenticator.create(mockConfig),
-            ).rejects.toThrow(
+            await expect(Defauth.create(mockConfig)).rejects.toThrow(
                 'Failed to discover OIDC issuer or create client: Init failed',
             );
         });
     });
 
     describe('JWT Token Handling', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         it('should successfully process valid JWT token', async () => {
@@ -188,7 +186,7 @@ describe('Authenticator - Token Validation and Processing', () => {
                 mockClientWithoutJwks as any,
             );
 
-            const authenticator = await Authenticator.create(mockConfig);
+            const authenticator = await Defauth.create(mockConfig);
 
             const result = await authenticator.getUser(MOCK_JWT_TOKEN);
 
@@ -202,10 +200,10 @@ describe('Authenticator - Token Validation and Processing', () => {
     });
 
     describe('Opaque Token Handling', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         it('should successfully process valid opaque token', async () => {

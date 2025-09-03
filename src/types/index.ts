@@ -133,7 +133,7 @@ export interface JwtValidationOptions {
 /**
  * Configuration options for the authenticator
  */
-export interface AuthenticatorConfig<TUser> {
+export interface DefauthConfig<TUser> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */

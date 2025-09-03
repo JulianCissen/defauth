@@ -14,7 +14,7 @@ const createJwtTokenContext = (sub: string): TokenContext => ({
     metadata: { validatedAt: new Date() },
 });
 
-describe('Authenticator - Component Integration and Utilities', () => {
+describe('Defauth - Component Integration and Utilities', () => {
     describe('Storage Integration', () => {
         it('should store and retrieve user data correctly', async () => {
             const storageAdapter = new InMemoryStorageAdapter();

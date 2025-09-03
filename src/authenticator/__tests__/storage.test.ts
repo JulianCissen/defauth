@@ -1,5 +1,5 @@
 import type {
-    AuthenticatorConfig,
+    DefauthConfig,
     StorageMetadata,
     UserClaims,
 } from '../../types/index.js';
@@ -27,11 +27,11 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 const { InMemoryStorageAdapter } = await import('../../storage/index.js');
 
-// Type alias for the authenticated Authenticator with UserClaims
-type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -49,10 +49,10 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - Storage and Caching', () => {
+describe('Defauth - Storage and Caching', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserClaims>;
+    let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -100,10 +100,10 @@ describe('Authenticator - Storage and Caching', () => {
     });
 
     describe('Storage Integration', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         it('should store user data after successful processing', async () => {
@@ -213,15 +213,13 @@ describe('Authenticator - Storage and Caching', () => {
             const inMemoryConfig = createMockConfig({
                 storageAdapter: new InMemoryStorageAdapter(),
             });
-            const inMemoryAuthenticator = await Authenticator.create(inMemoryConfig);
+            const inMemoryDefauth = await Defauth.create(inMemoryConfig);
 
             // Store some data
-            await inMemoryAuthenticator.getUser(MOCK_JWT_TOKEN);
+            await inMemoryDefauth.getUser(MOCK_JWT_TOKEN);
 
             // Clear cache
-            await expect(
-                inMemoryAuthenticator.clearCache(),
-            ).resolves.not.toThrow();
+            await expect(inMemoryDefauth.clearCache()).resolves.not.toThrow();
         });
     });
 });

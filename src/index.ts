@@ -1,11 +1,11 @@
-// Main export - the Authenticator class
-export { Authenticator } from './authenticator/index.js';
+// Main export - the Defauth class
+export { Defauth } from './authenticator/index.js';
 
 // Type exports for consumers of the library
 export type {
     UserClaims,
     UserRecord,
-    AuthenticatorConfig,
+    DefauthConfig,
     StorageAdapter,
     StorageMetadata,
     TokenContext,

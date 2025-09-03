@@ -1,5 +1,5 @@
 import { 
-    Authenticator, 
+    Defauth, 
     InMemoryStorageAdapter, 
     ConsoleLogger,
     // Error classes for structured error handling
@@ -11,7 +11,7 @@ import {
 } from '../src/index.js';
 import type { Logger, LogLevel } from '../src/index.js';
 
-// Example usage of the DefAuth library
+// Example usage of the Defauth library
 
 /**
  * Custom logger implementation example
@@ -30,7 +30,7 @@ class CustomLogger implements Logger {
 async function example() {
     // Example 1: Initialize using the static create method (recommended approach)
     // This ensures the authenticator is fully initialized before use
-    const authWithCustomLogger = await Authenticator.create({
+    const authWithCustomLogger = await Defauth.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret',
@@ -45,7 +45,7 @@ async function example() {
     });
 
     // Example 2: Initialize with default console logger using the static create method
-    const authWithConsoleLogger = await Authenticator.create({
+    const authWithConsoleLogger = await Defauth.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret',
@@ -58,7 +58,7 @@ async function example() {
     });
 
     // Example 3: Advanced configuration with custom refresh conditions
-    const authWithCustomRefresh = await Authenticator.create({
+    const authWithCustomRefresh = await Defauth.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-client-id',
         clientSecret: 'your-client-secret', // Provided for confidential clients
@@ -77,7 +77,7 @@ async function example() {
     });
     
     // Example 4: Public client configuration
-    const publicClientAuth = await Authenticator.create({
+    const publicClientAuth = await Defauth.create({
         issuer: 'https://your-oidc-provider.com',
         clientId: 'your-public-client-id',
         // No clientSecret needed for public clients (SPAs, mobile apps, etc.)

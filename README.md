@@ -17,11 +17,35 @@ A TypeScript library for handling OIDC authentication with support for both JWT 
 
 ### Breaking Changes
 
-**Constructor Deprecation**: The `new Authenticator()` constructor is deprecated and will be removed in the next major version.
+DefAuth v2.0 introduces **two major breaking changes** that require code updates:
 
-#### Before (v1.x)
+#### 1. **Class Rename**: `Authenticator` → `Defauth`
+
+The main class has been renamed from `Authenticator` to `Defauth` to avoid naming conflicts with user implementations.
+
+**Before (v1.x)**
 ```typescript
-// ❌ Old way - will be removed
+import { Authenticator, AuthenticatorConfig } from 'defauth';
+
+const auth = new Authenticator(config);
+// or
+const auth = await Authenticator.create(config);
+```
+
+**After (v2.0+)**
+```typescript
+import { Defauth, DefauthConfig } from 'defauth';
+
+const auth = await Defauth.create(config);
+```
+
+#### 2. **Constructor is Private**: Use `Defauth.create()` Only
+
+The constructor is now private and can only be accessed through the `Defauth.create()` static method. This ensures all instances are properly initialized.
+
+**Before (v1.x)**
+```typescript
+// ❌ Old way - constructor (synchronous)
 const auth = new Authenticator({
   issuer: 'https://example.com',
   clientId: 'client-id',
@@ -32,10 +56,10 @@ const auth = new Authenticator({
 const user = await auth.getUser(token);
 ```
 
-#### After (v2.0+)
+**After (v2.0+)**
 ```typescript
-// ✅ New way - recommended
-const auth = await Authenticator.create({
+// ✅ New way - async factory method (constructor is private)
+const auth = await Defauth.create({
   issuer: 'https://example.com',
   clientId: 'client-id',
   clientSecret: 'client-secret'
@@ -45,11 +69,27 @@ const auth = await Authenticator.create({
 const user = await auth.getUser(token);
 ```
 
+### Quick Migration Steps
+
+1. **Update imports**: Change `Authenticator` to `Defauth` in all import statements
+2. **Update types**: Change `AuthenticatorConfig` to `DefauthConfig` if using TypeScript
+3. **Replace constructor calls**: Change `new Authenticator()` or `new Defauth()` to `await Defauth.create()` (constructor is now private)
+4. **Replace static calls**: Change `Authenticator.create()` to `Defauth.create()`
+5. **Update variable names**: Optionally rename variables for consistency (e.g., `authenticator` → `defauth`)
+
+### Why These Changes?
+
+- **Class rename**: Prevents naming conflicts with user-defined authenticator classes
+- **Private constructor**: Enforces proper async initialization, eliminating race conditions and ensuring OIDC client setup
+- **Explicit error handling**: Clear failure modes during initialization
+- **Modern API patterns**: Consistent with Promise-based initialization patterns
+
 ### Benefits of Migration
 
-- **Explicit initialization**: Clear error handling during setup
-- **No race conditions**: Guaranteed ready state after Promise resolves
+- **No naming conflicts**: Avoid conflicts with your own authenticator implementations
+- **No race conditions**: Guaranteed ready state after Promise resolves  
 - **Better error messages**: Clearer failure modes during initialization
+- **Explicit initialization**: Clear error handling during setup
 - **Modern API**: Consistent with Promise-based patterns
 
 ## Installation
@@ -61,10 +101,10 @@ npm install defauth
 ## Quick Start
 
 ```typescript
-import { Authenticator } from 'defauth';
+import { Defauth } from 'defauth';
 
 // Create and initialize an authenticator (recommended approach)
-const auth = await Authenticator.create({
+const auth = await Defauth.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret' // Optional for public clients
@@ -79,7 +119,7 @@ const validatedUser = await auth.getUser(token, { forceIntrospection: true });
 console.log(user.sub, user.email, user.name);
 ```
 
-> **Breaking Change Notice**: The constructor approach (`new Authenticator()`) is deprecated and will be removed in a future version. Always use `Authenticator.create()` for proper initialization.
+> **Breaking Change Notice**: v2.0 introduces major breaking changes including class rename (`Authenticator` → `Defauth`) and private constructor (must use `Defauth.create()`). See the [Migration Guide](#migration-guide-v20) above for complete upgrade instructions.
 
 ## Configuration
 
@@ -88,7 +128,7 @@ console.log(user.sub, user.email, user.name);
 #### Confidential Client (with client secret)
 
 ```typescript
-const auth = await Authenticator.create({
+const auth = await Defauth.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret'
@@ -98,7 +138,7 @@ const auth = await Authenticator.create({
 #### Public Client (without client secret)
 
 ```typescript
-const auth = await Authenticator.create({
+const auth = await Defauth.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-public-client-id'
   // No client secret needed for public clients like SPAs or mobile apps
@@ -107,17 +147,17 @@ const auth = await Authenticator.create({
 
 ### Initialization
 
-The `Authenticator.create()` static method is the **only recommended way** to create an Authenticator instance. It returns a Promise that resolves with a fully initialized Authenticator:
+The `Defauth.create()` static method is the **only recommended way** to create a Defauth instance. It returns a Promise that resolves with a fully initialized Defauth:
 
 ```typescript
 try {
-  const auth = await Authenticator.create({
+  const auth = await Defauth.create({
     issuer: 'https://your-oidc-provider.com',
     clientId: 'your-client-id',
     clientSecret: 'your-client-secret'
   });
   
-  // Authenticator is guaranteed to be fully initialized and ready to use
+  // Defauth is guaranteed to be fully initialized and ready to use
   const user = await auth.getUser(token);
   console.log('User:', user);
 } catch (error) {
@@ -126,20 +166,20 @@ try {
 }
 ```
 
-**Key benefits of `Authenticator.create()`:**
+**Key benefits of `Defauth.create()`:**
 - ✅ Explicit error handling during initialization
 - ✅ No race conditions when calling `getUser()` immediately
 - ✅ Promise-based API consistent with modern JavaScript patterns
 - ✅ Clear initialization lifecycle
 - ✅ Built-in validation of OIDC configuration
 
-> **⚠️ Constructor Deprecation**: The `new Authenticator()` constructor is deprecated and will be removed in the next major version. It does not properly initialize the OIDC client and can lead to runtime errors. All code should migrate to using `Authenticator.create()`.
+> **⚠️ Constructor Deprecation**: The `new Defauth()` constructor is deprecated and will be removed in the next major version. It does not properly initialize the OIDC client and can lead to runtime errors. All code should migrate to using `Defauth.create()`.
 
 ### Advanced Configuration
 
 ```typescript
 import { 
-  Authenticator, 
+  Defauth, 
   InMemoryStorageAdapter,
   ConsoleLogger,
   defaultUserInfoRefreshCondition 
@@ -155,7 +195,7 @@ class CustomLogger implements Logger {
   }
 }
 
-const auth = await Authenticator.create({
+const auth = await Defauth.create({
   issuer: 'https://your-oidc-provider.com',
   clientId: 'your-client-id',
   clientSecret: 'your-client-secret',
@@ -201,7 +241,7 @@ The library automatically detects token types and handles them with a hybrid app
 The library supports custom logging implementations for better integration with your application's logging system:
 
 ```typescript
-import { Authenticator, Logger, LogLevel } from 'defauth';
+import { Defauth, Logger, LogLevel } from 'defauth';
 
 // Custom logger that integrates with your logging framework
 class MyAppLogger implements Logger {
@@ -217,7 +257,7 @@ class MyAppLogger implements Logger {
   }
 }
 
-const auth = new Authenticator({
+const auth = new Defauth({
   // ... other config
   logger: new MyAppLogger(),
   
@@ -235,13 +275,13 @@ You can configure how the library handles UserInfo endpoint failures:
 
 ```typescript
 // Strict mode - throws on any UserInfo failure
-const strictAuth = new Authenticator({
+const strictAuth = new Defauth({
   // ... config
   throwOnUserInfoFailure: true
 });
 
 // Resilient mode - logs warnings and continues (default)
-const resilientAuth = new Authenticator({
+const resilientAuth = new Defauth({
   // ... config
   throwOnUserInfoFailure: false
 });
@@ -289,7 +329,7 @@ class DatabaseStorageAdapter<TUser = UserClaims> implements StorageAdapter<TUser
   }
 }
 
-const auth = new Authenticator({
+const auth = new Defauth({
   // ... other config
   storageAdapter: new DatabaseStorageAdapter()
 });
@@ -317,7 +357,7 @@ const customCondition: UserInfoRefreshCondition = (user, metadata) => {
   return metadata.lastUserInfoRefresh <= fifteenMinutesAgo;
 };
 
-const auth = new Authenticator({
+const auth = new Defauth({
   // ... other config
   userInfoRefreshCondition: customCondition
 });
@@ -325,12 +365,13 @@ const auth = new Authenticator({
 
 ## API Reference
 
-### Authenticator Class
+### Defauth Class
 
-#### Constructor
+#### Static Factory Method
 ```typescript
-constructor(config: AuthenticatorConfig)
+static async create<TUser>(config: DefauthConfig<TUser>): Promise<Defauth<TUser>>
 ```
+Creates and initializes a new Defauth instance. This is the only way to create instances since the constructor is private.
 
 #### Methods
 
@@ -353,7 +394,7 @@ Metadata stored alongside user data in storage adapters.
 #### `UserRecord`
 **Deprecated**: Extended user record that combines user claims and metadata. Use separate `user` and `metadata` objects instead.
 
-#### `AuthenticatorConfig`
+#### `DefauthConfig`
 Configuration object for the authenticator.
 
 #### `StorageAdapter<TUser>`
@@ -403,7 +444,7 @@ DefAuth exports the following custom error classes:
 
 ```typescript
 import { 
-  Authenticator, 
+  Defauth, 
   InitializationError, 
   TokenValidationError, 
   JwtVerificationError,

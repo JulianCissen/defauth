@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
+import type { DefauthConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -23,7 +23,7 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 const { InMemoryStorageAdapter } = await import('../../storage/index.js');
 
 const {
@@ -41,10 +41,10 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - Initialization and Configuration', () => {
+describe('Defauth - Initialization and Configuration', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserClaims>;
+    let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -94,7 +94,7 @@ describe('Authenticator - Initialization and Configuration', () => {
     describe('Static Create Method and Initialization', () => {
         it('should create authenticator with default configuration using static method', async () => {
             const config = createMockConfig();
-            const authenticator = await Authenticator.create(config);
+            const authenticator = await Defauth.create(config);
 
             expect(authenticator).toBeDefined();
             expect(openidMock.discovery).toHaveBeenCalledWith(
@@ -110,7 +110,7 @@ describe('Authenticator - Initialization and Configuration', () => {
 
         it('should create authenticator using static create method', async () => {
             const config = createMockConfig();
-            const authenticator = await Authenticator.create(config);
+            const authenticator = await Defauth.create(config);
 
             // Verify authenticator was created successfully and is ready
             expect(authenticator).toBeDefined();
@@ -129,7 +129,7 @@ describe('Authenticator - Initialization and Configuration', () => {
             const discoveryError = new Error('Discovery failed');
             openidMock.discovery.mockRejectedValue(discoveryError);
 
-            await expect(Authenticator.create(mockConfig)).rejects.toThrow(
+            await expect(Defauth.create(mockConfig)).rejects.toThrow(
                 'Failed to discover OIDC issuer or create client: Discovery failed',
             );
         });
@@ -138,7 +138,7 @@ describe('Authenticator - Initialization and Configuration', () => {
             const customAdapter = new InMemoryStorageAdapter();
             const config = createMockConfig({ storageAdapter: customAdapter });
 
-            const authenticator = await Authenticator.create(config);
+            const authenticator = await Defauth.create(config);
 
             expect(authenticator).toBeDefined();
             expect(config.storageAdapter).toBe(customAdapter);

@@ -1,16 +1,5 @@
 import * as jose from 'jose';
 import * as openid from 'openid-client';
-import type {
-    AuthenticatorConfig,
-    JwtValidationOptions,
-    Logger,
-    StorageAdapter,
-    StorageMetadata,
-    TokenContext,
-    UserClaims,
-    UserInfoRefreshCondition,
-    UserInfoStrategy,
-} from '../types/index.js';
 import {
     ConsoleLogger,
     defaultUserInfoRefreshCondition,
@@ -26,13 +15,24 @@ import {
     UserClaimsSchema,
     UserInfoError,
 } from '../types/index.js';
+import type {
+    DefauthConfig,
+    JwtValidationOptions,
+    Logger,
+    StorageAdapter,
+    StorageMetadata,
+    TokenContext,
+    UserClaims,
+    UserInfoRefreshCondition,
+    UserInfoStrategy,
+} from '../types/index.js';
 import { InMemoryStorageAdapter } from '../storage/index.js';
 import type { IntrospectionResponse } from 'oauth4webapi';
 
 /**
- * Main authenticator class that handles OIDC authentication and user management
+ * Defauth - Main authentication class that handles OIDC authentication and user management
  */
-export class Authenticator<TUser> {
+export class Defauth<TUser> {
     private clientConfig?: openid.Configuration;
     private clientId: string;
     private storageAdapter: StorageAdapter<TUser>;
@@ -41,7 +41,7 @@ export class Authenticator<TUser> {
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
     private globalJwtValidationOptions: JwtValidationOptions;
-    private initializationConfig?: AuthenticatorConfig<TUser>;
+    private initializationConfig?: DefauthConfig<TUser>;
 
     private static readonly JWT_METADATA_CLAIMS = [
         'client_id',
@@ -61,28 +61,25 @@ export class Authenticator<TUser> {
     ] as const;
 
     /**
-     * Creates and initializes an Authenticator instance asynchronously
+     * Creates and initializes a Defauth instance asynchronously
      * @param config - Configuration options for the authenticator
-     * @returns Promise resolving to a fully initialized Authenticator instance
+     * @returns Promise resolving to a fully initialized Defauth instance
      * @throws InitializationError if OIDC client initialization fails
      */
     static async create<TUser>(
-        config: AuthenticatorConfig<TUser>,
-    ): Promise<Authenticator<TUser>> {
-        const authenticator = new Authenticator(config);
+        config: DefauthConfig<TUser>,
+    ): Promise<Defauth<TUser>> {
+        const authenticator = new Defauth(config);
         await authenticator.initializeClient(config);
         return authenticator;
     }
 
     /**
-     * Creates an instance of the Authenticator
+     * Creates a new Defauth instance
      * @param config - Configuration options for the authenticator
-     * @deprecated Use Authenticator.create() instead. The constructor does not initialize the OIDC client
-     * and will require manual initialization. This constructor will be removed in a future version.
-     * @internal This constructor is primarily for internal use by the static create method.
+     * @internal Private constructor - use Defauth.create() for proper initialization
      */
-    constructor(config: AuthenticatorConfig<TUser>) {
-        // WARNING: Constructor is deprecated - use Authenticator.create() instead
+    private constructor(config: DefauthConfig<TUser>) {
         this.clientId = config.clientId;
         this.initializationConfig = config;
         this.storageAdapter =
@@ -138,7 +135,7 @@ export class Authenticator<TUser> {
      * @param config - Configuration options
      */
     private async initializeClient(
-        config: AuthenticatorConfig<TUser>,
+        config: DefauthConfig<TUser>,
     ): Promise<void> {
         try {
             this.clientConfig = await openid.discovery(
@@ -173,9 +170,11 @@ export class Authenticator<TUser> {
         if (!this.clientConfig && this.initializationConfig) {
             await this.initializeClient(this.initializationConfig);
         }
-        
+
         if (!this.clientConfig) {
-            throw new Error('OIDC client is not initialized. Use Authenticator.create() for proper initialization.');
+            throw new Error(
+                'OIDC client is not initialized. Use Defauth.create() for proper initialization.',
+            );
         }
     }
 
@@ -405,10 +404,7 @@ export class Authenticator<TUser> {
      * @returns User claims object
      */
     private createUserClaimsFromPayload(payload: UserClaims): UserClaims {
-        return this.extractUserClaims(
-            payload,
-            Authenticator.JWT_METADATA_CLAIMS,
-        );
+        return this.extractUserClaims(payload, Defauth.JWT_METADATA_CLAIMS);
     }
 
     /**
@@ -520,7 +516,7 @@ export class Authenticator<TUser> {
     ): UserClaims {
         return this.extractUserClaims(
             response,
-            Authenticator.INTROSPECTION_METADATA_CLAIMS,
+            Defauth.INTROSPECTION_METADATA_CLAIMS,
         );
     }
 

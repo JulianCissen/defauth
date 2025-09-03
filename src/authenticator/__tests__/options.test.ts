@@ -23,10 +23,10 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 
-// Type alias for the authenticated Authenticator with UserClaims
-type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -43,7 +43,7 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - Configuration Options and Validation', () => {
+describe('Defauth - Configuration Options and Validation', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
 
@@ -89,7 +89,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
     });
 
     describe('JWT Validation Options', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
             // Create authenticator with custom global JWT validation options
@@ -101,7 +101,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
                     clockTolerance: '2 minutes',
                 },
             });
-            authenticator = await Authenticator.create(configWithJwtOptions);
+            authenticator = await Defauth.create(configWithJwtOptions);
         });
 
         it('should use global JWT validation options by default', async () => {
@@ -270,7 +270,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
     });
 
     describe('Default JWT Validation Options', () => {
-        let defaultAuthenticator: UserClaimsAuthenticator;
+        let defaultDefauth: UserClaimsDefauth;
 
         beforeEach(async () => {
             // Create authenticator without custom JWT validation options
@@ -278,11 +278,11 @@ describe('Authenticator - Configuration Options and Validation', () => {
                 storageAdapter: mockStorageAdapter,
                 logger: mockLogger,
             });
-            defaultAuthenticator = await Authenticator.create(defaultConfig);
+            defaultDefauth = await Defauth.create(defaultConfig);
         });
 
         it('should use default JWT validation options when none are provided', async () => {
-            await defaultAuthenticator.getUser(MOCK_JWT_TOKEN);
+            await defaultDefauth.getUser(MOCK_JWT_TOKEN);
 
             expect(joseMock.jwtVerify).toHaveBeenCalledWith(
                 MOCK_JWT_TOKEN,
@@ -295,7 +295,7 @@ describe('Authenticator - Configuration Options and Validation', () => {
         });
 
         it('should allow per-call options to override defaults', async () => {
-            await defaultAuthenticator.getUser(MOCK_JWT_TOKEN, {
+            await defaultDefauth.getUser(MOCK_JWT_TOKEN, {
                 clockTolerance: '5 minutes',
                 requiredClaims: ['sub', 'aud', 'iss'],
             });

@@ -1,4 +1,4 @@
-import type { AuthenticatorConfig, UserClaims } from '../../types/index.js';
+import type { DefauthConfig, UserClaims } from '../../types/index.js';
 import {
     afterEach,
     beforeEach,
@@ -23,10 +23,10 @@ jest.unstable_mockModule('openid-client', () => ({
 }));
 
 // Import modules after mocking
-const { Authenticator } = await import('../authenticator.js');
+const { Defauth } = await import('../defauth.js');
 
-// Type alias for the authenticated Authenticator with UserClaims
-type UserClaimsAuthenticator = InstanceType<typeof Authenticator<UserClaims>>;
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
@@ -44,10 +44,10 @@ const {
 const joseMock = jest.mocked(await import('jose'));
 const openidMock = jest.mocked(await import('openid-client'));
 
-describe('Authenticator - Performance and API Call Optimization', () => {
+describe('Defauth - Performance and API Call Optimization', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockLogger: InstanceType<typeof MockLogger>;
-    let mockConfig: AuthenticatorConfig<UserClaims>;
+    let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -95,10 +95,10 @@ describe('Authenticator - Performance and API Call Optimization', () => {
     });
 
     describe('API Call Limiting', () => {
-        let authenticator: UserClaimsAuthenticator;
+        let authenticator: UserClaimsDefauth;
 
         beforeEach(async () => {
-            authenticator = await Authenticator.create(mockConfig);
+            authenticator = await Defauth.create(mockConfig);
         });
 
         describe('Token Introspection Call Limiting', () => {
