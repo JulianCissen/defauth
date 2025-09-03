@@ -6,7 +6,7 @@ import {
     getTokenType,
 } from '../utils/index.js';
 import {
-    DefAuthError,
+    DefauthError,
     InitializationError,
     IntrospectionError,
     JwtVerificationError,
@@ -154,17 +154,17 @@ export class Defauth<TUser> {
     /**
      * Validate token input
      * @param token - The token to validate
-     * @throws Error if token is invalid
+     * @throws TokenValidationError if token is invalid
      */
     private validateToken(token: string): void {
         if (!token) {
-            throw new Error('Token is required');
+            throw new TokenValidationError('Token is required');
         }
     }
 
     /**
      * Ensure client is initialized, initialize lazily if needed
-     * @throws Error if client initialization fails
+     * @throws InitializationError if client initialization fails
      */
     private async ensureInitialized(): Promise<void> {
         if (!this.clientConfig && this.initializationConfig) {
@@ -172,7 +172,7 @@ export class Defauth<TUser> {
         }
 
         if (!this.clientConfig) {
-            throw new Error(
+            throw new InitializationError(
                 'OIDC client is not initialized. Use Defauth.create() for proper initialization.',
             );
         }
@@ -296,8 +296,8 @@ export class Defauth<TUser> {
                     !!tokenContext.userInfoResult,
             });
         } catch (error) {
-            // If it's already a DefAuth error, re-throw it to preserve the specific error type
-            if (error instanceof DefAuthError) {
+            // If it's already a Defauth error, re-throw it to preserve the specific error type
+            if (error instanceof DefauthError) {
                 throw error;
             }
             throw new TokenValidationError(
@@ -368,7 +368,7 @@ export class Defauth<TUser> {
         options?: JwtValidationOptions,
     ): Promise<jose.JWTVerifyResult> {
         if (!this.clientConfig) {
-            throw new Error('OIDC client configuration is not initialized');
+            throw new InitializationError('OIDC client configuration is not initialized');
         }
 
         try {
@@ -376,7 +376,7 @@ export class Defauth<TUser> {
             const jwksUri = metadata['jwks_uri'] as string;
 
             if (!jwksUri) {
-                throw new Error('No JWKS URI found in server metadata');
+                throw new JwtVerificationError('No JWKS URI found in server metadata');
             }
 
             const jwks = jose.createRemoteJWKSet(new URL(jwksUri));
@@ -490,7 +490,7 @@ export class Defauth<TUser> {
         token: string,
     ): Promise<IntrospectionResponse> {
         if (!this.clientConfig) {
-            throw new Error('OIDC client configuration is not initialized');
+            throw new InitializationError('OIDC client configuration is not initialized');
         }
 
         try {
@@ -531,7 +531,7 @@ export class Defauth<TUser> {
         expectedSubject: string,
     ): Promise<UserClaims> {
         if (!this.clientConfig) {
-            throw new Error('OIDC client configuration is not initialized');
+            throw new InitializationError('OIDC client configuration is not initialized');
         }
 
         try {
@@ -539,7 +539,7 @@ export class Defauth<TUser> {
             const userInfoEndpoint = metadata['userinfo_endpoint'] as string;
 
             if (!userInfoEndpoint) {
-                throw new Error(
+                throw new UserInfoError(
                     'No UserInfo endpoint found in server metadata',
                 );
             }

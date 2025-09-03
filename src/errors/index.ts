@@ -1,14 +1,14 @@
 /**
- * Base error class for all DefAuth errors
+ * Base error class for all Defauth errors
  */
-export class DefAuthError extends Error {
+export class DefauthError extends Error {
     /**
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
     constructor(message: string, cause?: Error) {
         super(cause ? `${message}: ${cause.message}` : message);
-        this.name = 'DefAuthError';
+        this.name = 'DefauthError';
         this.cause = cause;
     }
 }
@@ -16,7 +16,7 @@ export class DefAuthError extends Error {
 /**
  * Error thrown when OIDC client initialization fails
  */
-export class InitializationError extends DefAuthError {
+export class InitializationError extends DefauthError {
     /**
      * @param message - Error message
      * @param cause - The original error that caused this error
@@ -30,7 +30,7 @@ export class InitializationError extends DefAuthError {
 /**
  * Error thrown when token validation fails
  */
-export class TokenValidationError extends DefAuthError {
+export class TokenValidationError extends DefauthError {
     /**
      * @param message - Error message
      * @param cause - The original error that caused this error
@@ -44,7 +44,7 @@ export class TokenValidationError extends DefAuthError {
 /**
  * Error thrown when user info fetching fails
  */
-export class UserInfoError extends DefAuthError {
+export class UserInfoError extends DefauthError {
     /**
      * @param message - Error message
      * @param cause - The original error that caused this error
@@ -58,7 +58,7 @@ export class UserInfoError extends DefAuthError {
 /**
  * Error thrown when token introspection fails
  */
-export class IntrospectionError extends DefAuthError {
+export class IntrospectionError extends DefauthError {
     /**
      * @param message - Error message
      * @param cause - The original error that caused this error

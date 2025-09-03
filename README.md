@@ -17,7 +17,7 @@ A TypeScript library for handling OIDC authentication with support for both JWT 
 
 ### Breaking Changes
 
-DefAuth v2.0 introduces **two major breaking changes** that require code updates:
+DefAuth v2.0 introduces **three major breaking changes** that require code updates:
 
 #### 1. **Class Rename**: `Authenticator` → `Defauth`
 
@@ -69,18 +69,50 @@ const auth = await Defauth.create({
 const user = await auth.getUser(token);
 ```
 
+#### 3. **Error Class Rename**: `DefAuthError` → `DefauthError`
+
+The base error class has been renamed from `DefAuthError` to `DefauthError` for naming consistency.
+
+**Before (v1.x)**
+```typescript
+import { DefAuthError } from 'defauth';
+
+try {
+  const user = await auth.getUser(token);
+} catch (error) {
+  if (error instanceof DefAuthError) {
+    // Handle DefAuth-specific errors
+  }
+}
+```
+
+**After (v2.0+)**
+```typescript
+import { DefauthError } from 'defauth';
+
+try {
+  const user = await auth.getUser(token);
+} catch (error) {
+  if (error instanceof DefauthError) {
+    // Handle Defauth-specific errors
+  }
+}
+```
+
 ### Quick Migration Steps
 
 1. **Update imports**: Change `Authenticator` to `Defauth` in all import statements
 2. **Update types**: Change `AuthenticatorConfig` to `DefauthConfig` if using TypeScript
-3. **Replace constructor calls**: Change `new Authenticator()` or `new Defauth()` to `await Defauth.create()` (constructor is now private)
-4. **Replace static calls**: Change `Authenticator.create()` to `Defauth.create()`
-5. **Update variable names**: Optionally rename variables for consistency (e.g., `authenticator` → `defauth`)
+3. **Update error imports**: Change `DefAuthError` to `DefauthError` in import statements and error handling code
+4. **Replace constructor calls**: Change `new Authenticator()` or `new Defauth()` to `await Defauth.create()` (constructor is now private)
+5. **Replace static calls**: Change `Authenticator.create()` to `Defauth.create()`
+6. **Update variable names**: Optionally rename variables for consistency (e.g., `authenticator` → `defauth`)
 
 ### Why These Changes?
 
 - **Class rename**: Prevents naming conflicts with user-defined authenticator classes
 - **Private constructor**: Enforces proper async initialization, eliminating race conditions and ensuring OIDC client setup
+- **Error class consistency**: Maintains naming consistency across the entire API (`Defauth` → `DefauthError`)
 - **Explicit error handling**: Clear failure modes during initialization
 - **Modern API patterns**: Consistent with Promise-based initialization patterns
 
@@ -119,7 +151,7 @@ const validatedUser = await auth.getUser(token, { forceIntrospection: true });
 console.log(user.sub, user.email, user.name);
 ```
 
-> **Breaking Change Notice**: v2.0 introduces major breaking changes including class rename (`Authenticator` → `Defauth`) and private constructor (must use `Defauth.create()`). See the [Migration Guide](#migration-guide-v20) above for complete upgrade instructions.
+> **Breaking Change Notice**: v2.0 introduces major breaking changes including class rename (`Authenticator` → `Defauth`), error class rename (`DefAuthError` → `DefauthError`), and private constructor (must use `Defauth.create()`). See the [Migration Guide](#migration-guide-v20) above for complete upgrade instructions.
 
 ## Configuration
 
@@ -433,7 +465,7 @@ The library provides structured error handling with custom error classes for dif
 
 DefAuth exports the following custom error classes:
 
-- **`DefAuthError`**: Base error class for all DefAuth errors
+- **`DefauthError`**: Base error class for all Defauth errors
 - **`InitializationError`**: Thrown when OIDC client initialization fails
 - **`TokenValidationError`**: Thrown when token validation fails
 - **`JwtVerificationError`**: Thrown when JWT signature verification fails (extends TokenValidationError)

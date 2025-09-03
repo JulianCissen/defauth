@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 // Re-export error classes
 export {
-    DefAuthError,
+    DefauthError,
     InitializationError,
     TokenValidationError,
     UserInfoError,

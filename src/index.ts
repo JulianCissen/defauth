@@ -17,7 +17,7 @@ export type {
 
 // Error exports
 export {
-    DefAuthError,
+    DefauthError,
     InitializationError,
     TokenValidationError,
     UserInfoError,
