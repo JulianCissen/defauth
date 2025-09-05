@@ -37,6 +37,7 @@ export class Defauth<TUser> {
     private clientConfig?: openid.Configuration;
     private clientId: string;
     private clientSecret?: string;
+    private audience: string | string[];
     private authenticationMethod: AuthenticationMethod;
     private allowInsecureRequests: boolean;
     private storageAdapter: StorageAdapter<TUser>;
@@ -86,6 +87,7 @@ export class Defauth<TUser> {
     private constructor(config: DefauthConfig<TUser>) {
         this.clientId = config.clientId;
         this.clientSecret = config.clientSecret;
+        this.audience = config.audience || config.clientId;
         this.authenticationMethod =
             config.authenticationMethod ||
             (config.clientSecret ? 'client_secret_post' : 'none');
@@ -432,7 +434,7 @@ export class Defauth<TUser> {
 
             return await jose.jwtVerify(token, jwks, {
                 ...jwtVerifyOptions,
-                audience: this.clientId,
+                audience: this.audience,
             });
         } catch (error) {
             throw new JwtVerificationError(

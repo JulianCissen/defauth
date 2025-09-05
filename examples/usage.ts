@@ -85,6 +85,26 @@ async function example() {
         // Using default storage adapter and refresh conditions
     });
 
+    // Example 5: Custom audience configuration
+    const authWithCustomAudience = await Defauth.create({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret',
+        
+        // Single custom audience (different from clientId)
+        audience: 'https://api.example.com',
+    });
+
+    // Example 6: Multiple valid audiences configuration
+    const authWithMultipleAudiences = await Defauth.create({
+        issuer: 'https://your-oidc-provider.com',
+        clientId: 'your-client-id',
+        clientSecret: 'your-client-secret',
+        
+        // Multiple audiences
+        audience: ['https://api.example.com', 'https://gateway.example.com', 'your-client-id'],
+    });
+
     // Example JWT token (this would come from your request headers)
     const jwtToken = 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...';
 

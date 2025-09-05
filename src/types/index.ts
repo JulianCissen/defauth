@@ -147,6 +147,11 @@ interface BaseDefauthConfig<TUser> {
     issuer: string;
     /** Client ID */
     clientId: string;
+    /**
+     * Audience for JWT verification (defaults to clientId)
+     * Can be a string or array of strings
+     */
+    audience?: string | string[];
     /** Storage adapter (defaults to in-memory) */
     storageAdapter?: StorageAdapter<TUser>;
     /**

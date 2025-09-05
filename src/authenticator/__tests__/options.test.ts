@@ -9,6 +9,7 @@ import {
 import type { UserClaims } from '../../types/index.js';
 
 const {
+    MOCK_CLIENT_ID,
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
     MOCK_USERINFO_RESPONSE,
@@ -293,6 +294,72 @@ describe('Defauth - Configuration Options and Validation', () => {
                 expect.objectContaining({
                     clockTolerance: '5 minutes',
                     requiredClaims: ['sub', 'aud', 'iss'],
+                }),
+            );
+        });
+    });
+
+    describe('Audience Configuration', () => {
+        it('should use clientId as audience by default', async () => {
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    audience: MOCK_CLIENT_ID,
+                }),
+            );
+        });
+
+        it('should use custom string audience when configured', async () => {
+            const customAudience = 'https://api.example.com';
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig({
+                    audience: customAudience,
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    audience: customAudience,
+                }),
+            );
+        });
+
+        it('should use custom array audience when configured', async () => {
+            const customAudiences = [
+                'https://api.example.com',
+                'https://api2.example.com',
+            ];
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig({
+                    audience: customAudiences,
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    audience: customAudiences,
                 }),
             );
         });
