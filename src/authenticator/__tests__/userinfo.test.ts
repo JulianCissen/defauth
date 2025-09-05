@@ -8,25 +8,6 @@ import {
     jest,
 } from '@jest/globals';
 
-// Mock external dependencies using ESM mocking
-jest.unstable_mockModule('jose', () => ({
-    jwtVerify: jest.fn(),
-    createRemoteJWKSet: jest.fn(),
-    decodeProtectedHeader: jest.fn(),
-    decodeJwt: jest.fn(),
-}));
-
-jest.unstable_mockModule('openid-client', () => ({
-    discovery: jest.fn(),
-    tokenIntrospection: jest.fn(),
-    fetchUserInfo: jest.fn(),
-}));
-
-// Import modules after mocking
-const { Defauth } = await import('../defauth.js');
-
-// Type alias for the authenticated Defauth with UserClaims
-type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 const {
     MOCK_CLIENT_ID,
     MOCK_CLIENT_SECRET,
@@ -42,11 +23,17 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
+    setupModuleMocks,
 } = await import('./test-utils.js');
 
 // Get mocked modules
-const joseMock = jest.mocked(await import('jose'));
-const openidMock = jest.mocked(await import('openid-client'));
+const { joseMock, openidMock } = await setupModuleMocks();
+
+// Import modules after mocking
+const { Defauth } = await import('../defauth.js');
+
+// Type alias for the authenticated Defauth with UserClaims
+type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
 
 describe('Defauth - UserInfo Integration and Management', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;

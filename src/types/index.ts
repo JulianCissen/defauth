@@ -119,6 +119,15 @@ export type UserInfoStrategy =
     | 'none';
 
 /**
+ * Authentication mechanisms supported by OIDC providers
+ */
+export type AuthenticationMethod =
+    | 'client_secret_post'
+    | 'client_secret_basic'
+    | 'client_secret_jwt'
+    | 'none';
+
+/**
  * JWT validation options
  */
 export interface JwtValidationOptions {
@@ -131,15 +140,13 @@ export interface JwtValidationOptions {
 }
 
 /**
- * Configuration options for the authenticator
+ * Base configuration options for the authenticator
  */
-export interface DefauthConfig<TUser> {
+interface BaseDefauthConfig<TUser> {
     /** OIDC issuer URL */
     issuer: string;
     /** Client ID */
     clientId: string;
-    /** Client secret (optional for public clients) */
-    clientSecret?: string;
     /** Storage adapter (defaults to in-memory) */
     storageAdapter?: StorageAdapter<TUser>;
     /**
@@ -167,7 +174,40 @@ export interface DefauthConfig<TUser> {
      * Global JWT validation options (can be overridden per getUser call)
      */
     jwtValidationOptions?: JwtValidationOptions;
+    /**
+     * Whether to allow insecure requests (HTTP instead of HTTPS)
+     * Only use this for development or testing purposes
+     */
+    allowInsecureRequests?: boolean;
 }
+
+/**
+ * Configuration for public clients (no client secret)
+ */
+interface PublicClientConfig<TUser> extends BaseDefauthConfig<TUser> {
+    /** Client secret is not provided for public clients */
+    clientSecret?: undefined;
+    /** Authentication method must be 'none' for public clients */
+    authenticationMethod?: 'none';
+}
+
+/**
+ * Configuration for confidential clients (with client secret)
+ */
+interface ConfidentialClientConfig<TUser> extends BaseDefauthConfig<TUser> {
+    /** Client secret for confidential clients */
+    clientSecret: string;
+    /** Authentication method (defaults to 'client_secret_post') */
+    authenticationMethod?: AuthenticationMethod;
+}
+
+/**
+ * Configuration options for the authenticator
+ * Type is conditional based on whether clientSecret is provided
+ */
+export type DefauthConfig<TUser> =
+    | PublicClientConfig<TUser>
+    | ConfidentialClientConfig<TUser>;
 
 /**
  * Context for token validation containing information from validation process

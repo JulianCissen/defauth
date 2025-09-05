@@ -229,3 +229,41 @@ export const createMockJwtVerifyResult = (payload = MOCK_JWT_PAYLOAD) => ({
         typ: 'JWT',
     },
 });
+
+/**
+ * Sets up module mocks for jose and openid-client using Jest's unstable_mockModule.
+ * This function should be called before importing the modules you want to test.
+ * @returns Promise resolving to an object containing the mocked modules
+ */
+export const setupModuleMocks = async () => {
+    // Mock jose module
+    jest.unstable_mockModule('jose', () => ({
+        jwtVerify: jest.fn(),
+        createRemoteJWKSet: jest.fn(),
+        decodeProtectedHeader: jest.fn(),
+        decodeJwt: jest.fn(),
+    }));
+
+    // Mock openid-client module
+    jest.unstable_mockModule('openid-client', async () => ({
+        discovery: jest.fn(),
+        tokenIntrospection: jest.fn(),
+        fetchUserInfo: jest.fn(),
+
+        // Mock the authentication method constructors for testing
+        // Each returns a function that acts as the auth method
+        ClientSecretPost: jest.fn().mockReturnValue(jest.fn()),
+        ClientSecretBasic: jest.fn().mockReturnValue(jest.fn()),
+        ClientSecretJwt: jest.fn().mockReturnValue(jest.fn()),
+        None: jest.fn().mockReturnValue(jest.fn()),
+    }));
+
+    // Import and return the mocked modules
+    const joseMock = jest.mocked(await import('jose'));
+    const openidMock = jest.mocked(await import('openid-client'));
+
+    return {
+        joseMock,
+        openidMock,
+    };
+};

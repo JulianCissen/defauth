@@ -1,11 +1,7 @@
 import * as jose from 'jose';
 import * as openid from 'openid-client';
-import {
-    ConsoleLogger,
-    defaultUserInfoRefreshCondition,
-    getTokenType,
-} from '../utils/index.js';
 import type {
+    AuthenticationMethod,
     DefauthConfig,
     JwtValidationOptions,
     Logger,
@@ -16,6 +12,11 @@ import type {
     UserInfoRefreshCondition,
     UserInfoStrategy,
 } from '../types/index.js';
+import {
+    ConsoleLogger,
+    defaultUserInfoRefreshCondition,
+    getTokenType,
+} from '../utils/index.js';
 import {
     DefauthError,
     InitializationError,
@@ -35,6 +36,9 @@ import type { IntrospectionResponse } from 'oauth4webapi';
 export class Defauth<TUser> {
     private clientConfig?: openid.Configuration;
     private clientId: string;
+    private clientSecret?: string;
+    private authenticationMethod: AuthenticationMethod;
+    private allowInsecureRequests: boolean;
     private storageAdapter: StorageAdapter<TUser>;
     private userInfoRefreshCondition: UserInfoRefreshCondition<TUser>;
     private userInfoStrategy: UserInfoStrategy;
@@ -81,6 +85,11 @@ export class Defauth<TUser> {
      */
     private constructor(config: DefauthConfig<TUser>) {
         this.clientId = config.clientId;
+        this.clientSecret = config.clientSecret;
+        this.authenticationMethod =
+            config.authenticationMethod ||
+            (config.clientSecret ? 'client_secret_post' : 'none');
+        this.allowInsecureRequests = config.allowInsecureRequests || false;
         this.initializationConfig = config;
         this.storageAdapter =
             config.storageAdapter || new InMemoryStorageAdapter<TUser>();
@@ -138,16 +147,47 @@ export class Defauth<TUser> {
         config: DefauthConfig<TUser>,
     ): Promise<void> {
         try {
+            const executeOptions = this.allowInsecureRequests
+                ? [openid.allowInsecureRequests]
+                : [];
+
+            const authMethod = this.getAuthenticationMethod();
+
             this.clientConfig = await openid.discovery(
                 new URL(config.issuer),
-                config.clientId,
-                config.clientSecret,
+                this.clientId,
+                this.clientSecret,
+                authMethod,
+                {
+                    execute: executeOptions,
+                },
             );
         } catch (error) {
             throw new InitializationError(
                 'Failed to discover OIDC issuer or create client',
                 error as Error,
             );
+        }
+    }
+
+    /**
+     * Get the appropriate authentication method for the OIDC client
+     * @returns Authentication method for openid-client
+     */
+    private getAuthenticationMethod() {
+        switch (this.authenticationMethod) {
+            case 'client_secret_post':
+                return openid.ClientSecretPost(this.clientSecret);
+            case 'client_secret_basic':
+                return openid.ClientSecretBasic(this.clientSecret);
+            case 'client_secret_jwt':
+                return openid.ClientSecretJwt(this.clientSecret);
+            case 'none':
+                return openid.None();
+            default:
+                throw new InitializationError(
+                    `Unsupported authentication method: ${this.authenticationMethod}`,
+                );
         }
     }
 
