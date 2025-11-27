@@ -148,6 +148,15 @@ const user = await auth.getUser(token);
 // Force introspection (for high-security scenarios)
 const validatedUser = await auth.getUser(token, { forceIntrospection: true });
 
+// Custom validation (e.g., validate claim against request header)
+const user = await auth.getUser(token, {
+  customValidator: async (claims) => {
+    if (claims.organizationId !== requestOrgId) {
+      throw new Error('Organization mismatch');
+    }
+  }
+});
+
 console.log(user.sub, user.email, user.name);
 ```
 
@@ -241,6 +250,9 @@ const auth = await Defauth.create({
   // Optional: Throw on UserInfo failure instead of logging warnings (defaults to false)
   throwOnUserInfoFailure: true,
   
+  // Optional: Disable automatic introspection fallback for failed JWT verification (defaults to false)
+  disableIntrospectionFallthrough: true,
+  
   // Optional: Custom refresh condition
   userInfoRefreshCondition: (user, metadata) => {
     // Refresh user info every 30 minutes instead of default 1 hour
@@ -259,6 +271,8 @@ The library automatically detects token types and handles them with a hybrid app
 - Extracts user info from token claims
 - Checks storage for cached user data
 - Fetches additional data from UserInfo endpoint when conditions are met
+- By default, falls back to introspection if JWT verification fails
+- Can be configured to throw errors instead of falling back (see `disableIntrospectionFallthrough`)
 - Optionally introspects when explicitly requested with `forceIntrospection: true`
 - Merges claims from all sources with priority to UserInfo data
 
@@ -267,6 +281,87 @@ The library automatically detects token types and handles them with a hybrid app
 - Enhances with UserInfo endpoint data when available
 - Caches results in storage adapter
 - Updates both introspection and UserInfo refresh timestamps
+
+### Introspection Fallback Control
+
+By default, when JWT verification fails (e.g., invalid signature, expired token), DefAuth automatically falls back to token introspection. You can disable this behavior:
+
+```typescript
+const auth = await Defauth.create({
+  issuer: 'https://your-oidc-provider.com',
+  clientId: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  disableIntrospectionFallthrough: true // Throw errors instead of falling back
+});
+
+try {
+  const user = await auth.getUser(jwtToken);
+} catch (error) {
+  if (error instanceof JwtVerificationError) {
+    // JWT verification failed and no fallback occurred
+    console.error('JWT is invalid:', error.message);
+  }
+}
+```
+
+**When to disable introspection fallback:**
+- Strict security requirements where only JWT verification is acceptable
+- Performance-critical scenarios where introspection latency is unacceptable
+- Testing/debugging to ensure JWTs are always valid
+
+**Default behavior (recommended):**
+- Provides resilience against temporary JWT verification issues
+- Ensures tokens can still be validated even if JWKS is temporarily unavailable
+- Useful in mixed environments with varying token types
+
+### Custom Validation
+
+You can apply custom authentication or authorization logic to validate specific claim values before returning user data. This is useful for multi-tenant applications or request-specific validation:
+
+```typescript
+// Example: Validate organization ID from token matches request header
+app.get('/api/resource', async (req, res) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  const requestOrgId = req.headers['x-organization-id'];
+  
+  try {
+    const user = await auth.getUser(token, {
+      customValidator: async (claims) => {
+        // Validate organizationId claim matches request header
+        if (claims.organizationId !== requestOrgId) {
+          throw new Error('Token organization does not match request');
+        }
+        
+        // Additional validation logic as needed
+        if (!claims.email_verified) {
+          throw new Error('Email must be verified');
+        }
+      }
+    });
+    
+    res.json({ user });
+  } catch (error) {
+    if (error instanceof CustomValidationError) {
+      res.status(403).json({ error: 'Forbidden', message: error.message });
+    } else {
+      res.status(401).json({ error: 'Unauthorized' });
+    }
+  }
+});
+```
+
+**Key features:**
+- Runs after all claims are gathered (including UserInfo data)
+- Prevents user storage if validation fails
+- Works with both JWT and opaque tokens
+- Supports both synchronous and asynchronous validators
+- Throws `CustomValidationError` when validation fails
+
+**Common use cases:**
+- Multi-tenant applications validating tenant IDs
+- Validating claims against request headers or context
+- Enforcing custom authorization rules (roles, permissions, etc.)
+- Checking claim combinations or business logic constraints
 
 ## Custom Logging
 
@@ -407,8 +502,32 @@ Creates and initializes a new Defauth instance. This is the only way to create i
 
 #### Methods
 
-##### `getUser(token: string, options?: { forceIntrospection?: boolean }): Promise<UserClaims>`
-Main method to extract user information from any token type, with option to force introspection.
+##### `getUser(token: string, options?: JwtValidationOptions): Promise<UserClaims>`
+Main method to extract user information from any token type.
+
+**Options:**
+- `forceIntrospection?: boolean` - Force token introspection even for valid JWTs
+- `clockTolerance?: string` - Clock tolerance for JWT expiration validation (default: '1 minute')
+- `requiredClaims?: string[]` - Required claims that must be present in the JWT (default: ['sub', 'exp'])
+- `customValidator?: (claims: UserClaims) => Promise<void> | void` - Custom validation function
+
+**Example:**
+```typescript
+// Basic usage
+const user = await auth.getUser(token);
+
+// With custom validation
+const user = await auth.getUser(token, {
+  customValidator: async (claims) => {
+    if (claims.organizationId !== requestOrgId) {
+      throw new Error('Organization mismatch');
+    }
+  }
+});
+
+// Force introspection
+const user = await auth.getUser(token, { forceIntrospection: true });
+```
 
 ##### `clearCache(): Promise<void>`
 Clears all cached user data (useful for testing).
@@ -469,6 +588,7 @@ DefAuth exports the following custom error classes:
 - **`InitializationError`**: Thrown when OIDC client initialization fails
 - **`TokenValidationError`**: Thrown when token validation fails
 - **`JwtVerificationError`**: Thrown when JWT signature verification fails (extends TokenValidationError)
+- **`CustomValidationError`**: Thrown when custom validation fails (extends TokenValidationError)
 - **`UserInfoError`**: Thrown when UserInfo endpoint fails (when `throwOnUserInfoFailure: true`)
 - **`IntrospectionError`**: Thrown when token introspection fails
 
@@ -480,19 +600,29 @@ import {
   InitializationError, 
   TokenValidationError, 
   JwtVerificationError,
+  CustomValidationError,
   UserInfoError,
   IntrospectionError 
 } from 'defauth';
 
 try {
-  const user = await auth.getUser(token);
+  const user = await auth.getUser(token, {
+    customValidator: async (claims) => {
+      if (claims.organizationId !== requestOrgId) {
+        throw new Error('Organization mismatch');
+      }
+    }
+  });
 } catch (error) {
   if (error instanceof InitializationError) {
     // Handle OIDC client initialization failure
     console.error('Failed to initialize OIDC client:', error.message);
   } else if (error instanceof JwtVerificationError) {
-    // Handle JWT signature verification failure
+    // Handle JWT signature verification failure (when disableIntrospectionFallthrough: true)
     console.error('JWT signature verification failed:', error.message);
+  } else if (error instanceof CustomValidationError) {
+    // Handle custom validation failure
+    console.error('Custom validation failed:', error.message);
   } else if (error instanceof UserInfoError) {
     // Handle UserInfo endpoint failure
     console.error('UserInfo fetch failed:', error.message);
