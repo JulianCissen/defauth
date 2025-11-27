@@ -99,9 +99,9 @@ export const MOCK_USERINFO_RESPONSE = {
 /**
  * Mock storage adapter that tracks method calls
  */
-export class MockStorageAdapter<TUser = UserClaims>
-    implements StorageAdapter<TUser>
-{
+export class MockStorageAdapter<
+    TUser = UserClaims,
+> implements StorageAdapter<TUser> {
     private storage = new Map<
         string,
         { user: TUser; metadata: StorageMetadata }

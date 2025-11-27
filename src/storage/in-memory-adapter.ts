@@ -9,9 +9,9 @@ import type {
  * In-memory storage adapter implementation
  * This is the default storage adapter that keeps user data in memory
  */
-export class InMemoryStorageAdapter<TUser = UserClaims>
-    implements StorageAdapter<TUser>
-{
+export class InMemoryStorageAdapter<
+    TUser = UserClaims,
+> implements StorageAdapter<TUser> {
     private users: Map<string, { user: TUser; metadata: StorageMetadata }> =
         new Map();
 
