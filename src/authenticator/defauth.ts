@@ -2,6 +2,7 @@ import * as jose from 'jose';
 import * as openid from 'openid-client';
 import type {
     AuthenticationMethod,
+    CustomValidator,
     DefauthConfig,
     JwtValidationOptions,
     Logger,
@@ -18,6 +19,7 @@ import {
     getTokenType,
 } from '../utils/index.js';
 import {
+    CustomValidationError,
     DefauthError,
     InitializationError,
     IntrospectionError,
@@ -46,6 +48,7 @@ export class Defauth<TUser> {
     private logger: Logger;
     private throwOnUserInfoFailure: boolean;
     private globalJwtValidationOptions: JwtValidationOptions;
+    private disableIntrospectionFallthrough: boolean;
     private initializationConfig?: DefauthConfig<TUser>;
 
     private static readonly JWT_METADATA_CLAIMS = [
@@ -104,6 +107,8 @@ export class Defauth<TUser> {
             requiredClaims: ['sub', 'exp'],
             clockTolerance: '1 minute',
         };
+        this.disableIntrospectionFallthrough =
+            config.disableIntrospectionFallthrough || false;
     }
 
     /**
@@ -113,6 +118,7 @@ export class Defauth<TUser> {
      * @param options.forceIntrospection - Force token introspection even for valid JWTs
      * @param options.clockTolerance - Clock tolerance for JWT expiration validation
      * @param options.requiredClaims - Required claims that must be present in the JWT
+     * @param options.customValidator - Custom validator function for additional authentication/authorization logic
      * @returns Promise resolving to user claims
      * @throws Error if token is invalid or user cannot be retrieved
      */
@@ -126,7 +132,7 @@ export class Defauth<TUser> {
         const tokenType = getTokenType(token);
 
         if (tokenType === TokenType.OPAQUE) {
-            return this.handleOpaqueToken(token);
+            return this.handleOpaqueToken(token, options);
         }
 
         return this.handleJwtToken(token, options);
@@ -223,9 +229,13 @@ export class Defauth<TUser> {
     /**
      * Handle opaque token by introspecting
      * @param token - The opaque token
+     * @param options - JWT validation options (for customValidator)
      * @returns Promise resolving to user claims
      */
-    private async handleOpaqueToken(token: string): Promise<TUser> {
+    private async handleOpaqueToken(
+        token: string,
+        options?: JwtValidationOptions,
+    ): Promise<TUser> {
         const introspectionResult = await this.introspectToken(token);
         this.validateIntrospectionResult(introspectionResult);
 
@@ -274,6 +284,7 @@ export class Defauth<TUser> {
             userInfoAlreadyFetched:
                 this.userInfoStrategy === 'beforeUserRetrieval' &&
                 !!tokenContext.userInfoResult,
+            customValidator: options?.customValidator,
         });
     }
 
@@ -336,6 +347,7 @@ export class Defauth<TUser> {
                 userInfoAlreadyFetched:
                     this.userInfoStrategy === 'beforeUserRetrieval' &&
                     !!tokenContext.userInfoResult,
+                customValidator: options?.customValidator,
             });
         } catch (error) {
             // If it's already a Defauth error, re-throw it to preserve the specific error type
@@ -375,6 +387,10 @@ export class Defauth<TUser> {
                 const payload = UserClaimsSchema.parse(verifiedPayload);
                 return { type: 'jwt', payload };
             } catch (error) {
+                if (this.disableIntrospectionFallthrough) {
+                    // Re-throw the error if introspection fallthrough is disabled
+                    throw error;
+                }
                 this.logger.log(
                     'warn',
                     'JWT verification failed, falling back to introspection',
@@ -619,6 +635,7 @@ export class Defauth<TUser> {
      * @param options.userMetadata - Existing user metadata if available
      * @param options.forceIntrospection - Whether introspection was forced
      * @param options.userInfoAlreadyFetched - Whether UserInfo was already fetched (beforeUserRetrieval strategy)
+     * @param options.customValidator - Custom validator function for additional validation
      * @returns Promise resolving to processed user claims
      */
     private async processUserClaims(
@@ -630,6 +647,7 @@ export class Defauth<TUser> {
             userMetadata: StorageMetadata;
             forceIntrospection?: boolean;
             userInfoAlreadyFetched?: boolean;
+            customValidator?: CustomValidator;
         },
     ): Promise<TUser> {
         const {
@@ -638,6 +656,7 @@ export class Defauth<TUser> {
             userMetadata,
             forceIntrospection,
             userInfoAlreadyFetched,
+            customValidator,
         } = options;
         let finalClaims = userClaims;
 
@@ -668,6 +687,18 @@ export class Defauth<TUser> {
         } else if (userInfoAlreadyFetched) {
             // UserInfo was already fetched in beforeUserRetrieval strategy
             userMetadata.lastUserInfoRefresh = new Date();
+        }
+
+        // Run custom validator if provided
+        if (customValidator) {
+            try {
+                await customValidator(finalClaims);
+            } catch (error) {
+                throw new CustomValidationError(
+                    'Custom validation failed',
+                    error as Error,
+                );
+            }
         }
 
         const result = await this.storageAdapter.storeUser(

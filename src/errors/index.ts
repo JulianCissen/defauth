@@ -82,3 +82,17 @@ export class JwtVerificationError extends TokenValidationError {
         this.name = 'JwtVerificationError';
     }
 }
+
+/**
+ * Error thrown when custom validation fails
+ */
+export class CustomValidationError extends TokenValidationError {
+    /**
+     * @param message - Error message
+     * @param cause - The original error that caused this error
+     */
+    constructor(message: string, cause?: Error) {
+        super(message, cause);
+        this.name = 'CustomValidationError';
+    }
+}

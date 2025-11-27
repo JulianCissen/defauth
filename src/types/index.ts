@@ -9,6 +9,7 @@ export {
     UserInfoError,
     IntrospectionError,
     JwtVerificationError,
+    CustomValidationError,
 } from '../errors/index.js';
 
 /**
@@ -128,6 +129,14 @@ export type AuthenticationMethod =
     | 'none';
 
 /**
+ * Custom validator function type for adding custom authentication/authorization logic
+ * @param userClaims - The user claims extracted from the token
+ * @returns Promise resolving to void if validation passes
+ * @throws Error if validation fails
+ */
+export type CustomValidator = (userClaims: UserClaims) => Promise<void> | void;
+
+/**
  * JWT validation options
  */
 export interface JwtValidationOptions {
@@ -137,6 +146,8 @@ export interface JwtValidationOptions {
     clockTolerance?: string;
     /** Required claims that must be present in the JWT (default: ['sub', 'exp']) */
     requiredClaims?: string[];
+    /** Custom validator function to apply additional authentication/authorization logic */
+    customValidator?: CustomValidator;
 }
 
 /**
@@ -184,6 +195,12 @@ interface BaseDefauthConfig<TUser> {
      * Only use this for development or testing purposes
      */
     allowInsecureRequests?: boolean;
+    /**
+     * Disable automatic introspection fallback when JWT verification fails
+     * When true, JWT verification failures will throw an error instead of falling back to introspection
+     * (defaults to false)
+     */
+    disableIntrospectionFallthrough?: boolean;
 }
 
 /**
