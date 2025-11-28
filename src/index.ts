@@ -5,6 +5,7 @@ export { Defauth } from './authenticator/index.js';
 export type {
     UserClaims,
     UserRecord,
+    CustomValidator,
     DefauthConfig,
     StorageAdapter,
     StorageMetadata,
@@ -17,6 +18,7 @@ export type {
 
 // Error exports
 export {
+    CustomValidationError,
     DefauthError,
     InitializationError,
     TokenValidationError,
