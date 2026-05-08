@@ -1,26 +1,27 @@
+import * as jose from 'jose';
+import * as openid from 'openid-client';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DefauthConfig, UserClaims } from '../../types/index.js';
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-
-const {
+import { JwtVerificationError } from '../../types/index.js';
+import { Defauth } from '../defauth.js';
+import {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,
     MockLogger,
     MockStorageAdapter,
     createMockConfig,
     createMockOpenidClient,
-    setupModuleMocks,
-} = await import('./test-utils.js');
+} from './test-utils.js';
 
-const { joseMock, openidMock } = await setupModuleMocks();
-const { Defauth } = await import('../defauth.js');
-const { JwtVerificationError } = await import('../../types/index.js');
+const joseMock = vi.mocked(jose);
+const openidMock = vi.mocked(openid);
 
 describe('Defauth - Introspection Fallthrough Control', () => {
     let mockStorageAdapter: InstanceType<typeof MockStorageAdapter<UserClaims>>;
     let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockConfig = createMockConfig<UserClaims>({
             storageAdapter: mockStorageAdapter,
@@ -30,7 +31,7 @@ describe('Defauth - Introspection Fallthrough Control', () => {
         openidMock.discovery.mockResolvedValue(
             createMockOpenidClient() as never,
         );
-        joseMock.createRemoteJWKSet.mockReturnValue(jest.fn() as never);
+        joseMock.createRemoteJWKSet.mockReturnValue(vi.fn() as never);
         joseMock.decodeProtectedHeader.mockReturnValue({
             alg: 'RS256',
             typ: 'JWT',

@@ -20,18 +20,22 @@ export class ConsoleLogger implements Logger {
             : message;
 
         switch (level) {
-            case 'error':
+            case 'error': {
                 console.error(logMessage);
                 break;
-            case 'warn':
+            }
+            case 'warn': {
                 console.warn(logMessage);
                 break;
-            case 'info':
+            }
+            case 'info': {
                 console.info(logMessage);
                 break;
-            case 'debug':
+            }
+            case 'debug': {
                 console.debug(logMessage);
                 break;
+            }
         }
     }
 }

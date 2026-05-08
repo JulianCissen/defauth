@@ -1,3 +1,4 @@
+import { vi } from 'vitest';
 import type {
     DefauthConfig,
     IntrospectionResponse,
@@ -7,7 +8,6 @@ import type {
     TokenContext,
     UserClaims,
 } from '../../types/index.js';
-import { jest } from '@jest/globals';
 
 /**
  * Mock OIDC endpoints and responses for testing
@@ -56,8 +56,8 @@ export const MOCK_INTROSPECTION_ACTIVE: IntrospectionResponse = {
     preferred_username: 'testuser',
     client_id: MOCK_CLIENT_ID,
     scope: 'openid profile email',
-    exp: 9999999999,
-    iat: 1630000000,
+    exp: 9_999_999_999,
+    iat: 1_630_000_000,
 };
 
 /**
@@ -77,8 +77,8 @@ export const MOCK_JWT_PAYLOAD = {
     preferred_username: 'testuser',
     aud: MOCK_CLIENT_ID,
     iss: MOCK_ISSUER,
-    exp: 9999999999,
-    iat: 1630000000,
+    exp: 9_999_999_999,
+    iat: 1_630_000_000,
     client_id: MOCK_CLIENT_ID,
     scope: 'openid profile email',
     jti: 'token-id-123',
@@ -133,13 +133,13 @@ export class MockStorageAdapter<
         const result = { user: updatedUser, metadata };
         this.storeUserCalls.push({ user, claims: newClaims, metadata });
         this.storage.set(newClaims.sub, result);
-        return Promise.resolve(result.user);
+        return result.user;
     }
 
     async getAllUsers(): Promise<
         Array<{ user: TUser; metadata: StorageMetadata }>
     > {
-        return Array.from(this.storage.values());
+        return [...this.storage.values()];
     }
 
     // Test utilities
@@ -209,7 +209,7 @@ export const createMockConfig = <TUser = UserClaims>(
  * @returns Mock openid client with mocked methods
  */
 export const createMockOpenidClient = () => ({
-    serverMetadata: jest.fn().mockReturnValue({
+    serverMetadata: vi.fn().mockReturnValue({
         jwks_uri: 'https://mock-oidc-provider.com/.well-known/jwks',
         userinfo_endpoint: 'https://mock-oidc-provider.com/userinfo',
         token_introspection_endpoint:
@@ -229,41 +229,3 @@ export const createMockJwtVerifyResult = (payload = MOCK_JWT_PAYLOAD) => ({
         typ: 'JWT',
     },
 });
-
-/**
- * Sets up module mocks for jose and openid-client using Jest's unstable_mockModule.
- * This function should be called before importing the modules you want to test.
- * @returns Promise resolving to an object containing the mocked modules
- */
-export const setupModuleMocks = async () => {
-    // Mock jose module
-    jest.unstable_mockModule('jose', () => ({
-        jwtVerify: jest.fn(),
-        createRemoteJWKSet: jest.fn(),
-        decodeProtectedHeader: jest.fn(),
-        decodeJwt: jest.fn(),
-    }));
-
-    // Mock openid-client module
-    jest.unstable_mockModule('openid-client', async () => ({
-        discovery: jest.fn(),
-        tokenIntrospection: jest.fn(),
-        fetchUserInfo: jest.fn(),
-
-        // Mock the authentication method constructors for testing
-        // Each returns a function that acts as the auth method
-        ClientSecretPost: jest.fn().mockReturnValue(jest.fn()),
-        ClientSecretBasic: jest.fn().mockReturnValue(jest.fn()),
-        ClientSecretJwt: jest.fn().mockReturnValue(jest.fn()),
-        None: jest.fn().mockReturnValue(jest.fn()),
-    }));
-
-    // Import and return the mocked modules
-    const joseMock = jest.mocked(await import('jose'));
-    const openidMock = jest.mocked(await import('openid-client'));
-
-    return {
-        joseMock,
-        openidMock,
-    };
-};

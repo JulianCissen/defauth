@@ -1,11 +1,11 @@
+import { describe, expect, it } from 'vitest';
+import { InMemoryStorageAdapter } from '../../storage/index.js';
 import type {
     StorageMetadata,
     TokenContext,
     UserClaims,
 } from '../../types/index.js';
-import { describe, expect, it } from '@jest/globals';
 import { ConsoleLogger } from '../../utils/logger.js';
-import { InMemoryStorageAdapter } from '../../storage/index.js';
 import { defaultUserInfoRefreshCondition } from '../../utils/refresh-conditions.js';
 
 const createJwtTokenContext = (sub: string): TokenContext => ({

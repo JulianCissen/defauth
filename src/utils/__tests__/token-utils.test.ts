@@ -1,28 +1,14 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import * as jose from 'jose';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TokenType } from '../../types/index.js';
+import { getTokenType, isJwtToken } from '../token-utils.js';
 
-// Mock jose module for ESM compatibility
-jest.unstable_mockModule('jose', () => ({
-    decodeProtectedHeader: jest.fn(),
-    decodeJwt: jest.fn(),
-}));
-
-// Import modules after mocking
-const { getTokenType, isJwtToken } = await import('../token-utils.js');
-const { TokenType } = await import('../../types/index.js');
-
-// Get the mocked functions for test setup
-const jose = await import('jose');
-const mockDecodeProtectedHeader =
-    jose.decodeProtectedHeader as jest.MockedFunction<
-        typeof jose.decodeProtectedHeader
-    >;
-const mockDecodeJwt = jose.decodeJwt as jest.MockedFunction<
-    typeof jose.decodeJwt
->;
+const mockDecodeProtectedHeader = vi.mocked(jose.decodeProtectedHeader);
+const mockDecodeJwt = vi.mocked(jose.decodeJwt);
 
 describe('token-utils', () => {
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     describe('isJwtToken', () => {
@@ -35,7 +21,7 @@ describe('token-utils', () => {
             mockDecodeJwt.mockReturnValue({
                 sub: '1234567890',
                 name: 'John Doe',
-                iat: 1516239022,
+                iat: 1_516_239_022,
             });
 
             const validJwt =

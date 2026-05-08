@@ -1,35 +1,32 @@
 import {
+    type MockInstance,
     afterEach,
     beforeEach,
     describe,
     expect,
     it,
-    jest,
-} from '@jest/globals';
-import { ConsoleLogger } from '../logger.js';
+    vi,
+} from 'vitest';
 import type { LogLevel } from '../../types/index.js';
+import { ConsoleLogger } from '../logger.js';
 
 describe('ConsoleLogger', () => {
     let logger: ConsoleLogger;
-    let consoleErrorSpy: jest.SpiedFunction<typeof console.error>;
-    let consoleWarnSpy: jest.SpiedFunction<typeof console.warn>;
-    let consoleInfoSpy: jest.SpiedFunction<typeof console.info>;
-    let consoleDebugSpy: jest.SpiedFunction<typeof console.debug>;
+    let consoleErrorSpy: MockInstance;
+    let consoleWarnSpy: MockInstance;
+    let consoleInfoSpy: MockInstance;
+    let consoleDebugSpy: MockInstance;
 
     beforeEach(() => {
         logger = new ConsoleLogger();
 
         // Spy on console methods
-        consoleErrorSpy = jest
+        consoleErrorSpy = vi
             .spyOn(console, 'error')
             .mockImplementation(() => {});
-        consoleWarnSpy = jest
-            .spyOn(console, 'warn')
-            .mockImplementation(() => {});
-        consoleInfoSpy = jest
-            .spyOn(console, 'info')
-            .mockImplementation(() => {});
-        consoleDebugSpy = jest
+        consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        consoleInfoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+        consoleDebugSpy = vi
             .spyOn(console, 'debug')
             .mockImplementation(() => {});
     });
@@ -99,7 +96,7 @@ describe('ConsoleLogger', () => {
             const message = 'Complex context test';
             const context = {
                 user: { id: 'user123', name: 'Test User' },
-                timestamp: 1630000000000,
+                timestamp: 1_630_000_000_000,
                 metadata: ['tag1', 'tag2'],
                 error: { code: 'AUTH_FAILED', details: null },
             };
@@ -112,14 +109,14 @@ describe('ConsoleLogger', () => {
 
         it('should handle undefined context gracefully', () => {
             const message = 'Message without context';
-            logger.log('debug', message, undefined);
+            logger.log('debug', message);
 
             expect(consoleDebugSpy).toHaveBeenCalledWith(message);
         });
 
         it('should handle null context gracefully', () => {
             const message = 'Message with null context';
-            logger.log('debug', message, undefined);
+            logger.log('debug', message);
 
             expect(consoleDebugSpy).toHaveBeenCalledWith(message);
         });
@@ -188,9 +185,9 @@ describe('ConsoleLogger', () => {
         it('should work with all log levels in sequence', () => {
             const levels: LogLevel[] = ['error', 'warn', 'info', 'debug'];
 
-            levels.forEach((level, index) => {
+            for (const [index, level] of levels.entries()) {
                 logger.log(level, `Message ${index}`, { level, index });
-            });
+            }
 
             expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
             expect(consoleWarnSpy).toHaveBeenCalledTimes(1);

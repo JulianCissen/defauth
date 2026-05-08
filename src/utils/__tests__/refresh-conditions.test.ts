@@ -1,21 +1,22 @@
-import type { StorageMetadata, UserClaims } from '../../types/index.js';
 import {
+    type MockInstance,
     afterEach,
     beforeEach,
     describe,
     expect,
     it,
-    jest,
-} from '@jest/globals';
+    vi,
+} from 'vitest';
+import type { StorageMetadata, UserClaims } from '../../types/index.js';
 import { defaultUserInfoRefreshCondition } from '../refresh-conditions.js';
 
 describe('refresh-conditions', () => {
-    let dateNowSpy: jest.SpiedFunction<() => number>;
+    let dateNowSpy: MockInstance;
     let currentTime: number;
 
     beforeEach(() => {
-        currentTime = 1630000000000; // Fixed timestamp for consistent testing
-        dateNowSpy = jest.spyOn(Date, 'now');
+        currentTime = 1_630_000_000_000; // Fixed timestamp for consistent testing
+        dateNowSpy = vi.spyOn(Date, 'now');
         dateNowSpy.mockReturnValue(currentTime);
     });
 

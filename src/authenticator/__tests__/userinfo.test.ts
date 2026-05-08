@@ -1,14 +1,9 @@
+import * as jose from 'jose';
+import * as openid from 'openid-client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DefauthConfig, UserClaims } from '../../types/index.js';
+import { Defauth } from '../defauth.js';
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    jest,
-} from '@jest/globals';
-
-const {
     MOCK_CLIENT_ID,
     MOCK_CLIENT_SECRET,
     MOCK_INTROSPECTION_ACTIVE,
@@ -23,14 +18,10 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    setupModuleMocks,
-} = await import('./test-utils.js');
+} from './test-utils.js';
 
-// Get mocked modules
-const { joseMock, openidMock } = await setupModuleMocks();
-
-// Import modules after mocking
-const { Defauth } = await import('../defauth.js');
+const joseMock = vi.mocked(jose);
+const openidMock = vi.mocked(openid);
 
 // Type alias for the authenticated Defauth with UserClaims
 type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
@@ -41,7 +32,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
     let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
         mockConfig = createMockConfig<UserClaims>({
@@ -53,7 +44,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
         openidMock.discovery.mockResolvedValue(
             createMockOpenidClient() as never,
         );
-        joseMock.createRemoteJWKSet.mockReturnValue(jest.fn() as never);
+        joseMock.createRemoteJWKSet.mockReturnValue(vi.fn() as never);
         joseMock.jwtVerify.mockResolvedValue(
             createMockJwtVerifyResult() as never,
         );
@@ -67,8 +58,8 @@ describe('Defauth - UserInfo Integration and Management', () => {
             sub: 'user123',
             name: 'Test User',
             email: 'test@example.com',
-            iat: 1630000000,
-            exp: 9999999999,
+            iat: 1_630_000_000,
+            exp: 9_999_999_999,
             aud: 'test-client-id',
             iss: 'https://mock-oidc-provider.com',
         } as never);
@@ -82,7 +73,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     describe('UserInfo Integration', () => {
@@ -175,7 +166,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
             });
 
             it('should respect userInfoRefreshCondition in afterUserRetrieval strategy', async () => {
-                const customCondition = jest.fn().mockReturnValue(false);
+                const customCondition = vi.fn().mockReturnValue(false);
                 const authenticatorWithCondition = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,
@@ -187,7 +178,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
 
                 // Store a user first
                 await authenticatorWithCondition.getUser(MOCK_JWT_TOKEN);
-                jest.clearAllMocks();
+                vi.clearAllMocks();
 
                 // Second call should not fetch UserInfo due to condition
                 await authenticatorWithCondition.getUser(MOCK_JWT_TOKEN);
@@ -261,7 +252,7 @@ describe('Defauth - UserInfo Integration and Management', () => {
             });
 
             it('should always fetch UserInfo in beforeUserRetrieval strategy (condition ignored)', async () => {
-                const mockCondition = jest.fn().mockReturnValue(false);
+                const mockCondition = vi.fn().mockReturnValue(false);
                 const conditionalAuthenticator = await Defauth.create({
                     issuer: MOCK_ISSUER,
                     clientId: MOCK_CLIENT_ID,

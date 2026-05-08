@@ -1,26 +1,18 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "compilerOptions": {
-    /* Visit https://aka.ms/tsconfig to read more about this file */
-    /* Language and Environment */
-    "target": "ES2022",
-    /* Modules */
-    "module": "ESNext",
-    "moduleResolution": "Node",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    /* Interop Constraints */
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "moduleDetection": "force",
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    /* Type Checking */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    //"exactOptionalPropertyTypes": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
@@ -28,11 +20,12 @@
     "noPropertyAccessFromIndexSignature": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    /* Output Formatting */
-    "preserveWatchOutput": true
+    "noEmit": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "vitest.config.ts",
+    "vitest.setup.ts"
   ],
   "exclude": [
     "node_modules",

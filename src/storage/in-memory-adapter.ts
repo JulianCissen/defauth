@@ -62,6 +62,6 @@ export class InMemoryStorageAdapter<
      * @returns Array of all user records with metadata
      */
     getAllUsers(): Array<{ user: TUser; metadata: StorageMetadata }> {
-        return Array.from(this.users.values());
+        return [...this.users.values()];
     }
 }

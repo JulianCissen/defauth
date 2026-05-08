@@ -1,14 +1,9 @@
+import * as jose from 'jose';
+import * as openid from 'openid-client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DefauthConfig, UserClaims } from '../../types/index.js';
+import { Defauth } from '../defauth.js';
 import {
-    afterEach,
-    beforeEach,
-    describe,
-    expect,
-    it,
-    jest,
-} from '@jest/globals';
-
-const {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_PAYLOAD,
     MOCK_JWT_TOKEN,
@@ -20,14 +15,10 @@ const {
     createMockConfig,
     createMockJwtVerifyResult,
     createMockOpenidClient,
-    setupModuleMocks,
-} = await import('./test-utils.js');
+} from './test-utils.js';
 
-// Get mocked modules
-const { joseMock, openidMock } = await setupModuleMocks();
-
-// Import modules after mocking
-const { Defauth } = await import('../defauth.js');
+const joseMock = vi.mocked(jose);
+const openidMock = vi.mocked(openid);
 
 // Type alias for the authenticated Defauth with UserClaims
 type UserClaimsDefauth = Awaited<ReturnType<typeof Defauth.create<UserClaims>>>;
@@ -38,7 +29,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
     let mockConfig: DefauthConfig<UserClaims>;
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
         mockStorageAdapter = new MockStorageAdapter<UserClaims>();
         mockLogger = new MockLogger();
         mockConfig = createMockConfig<UserClaims>({
@@ -50,7 +41,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
         openidMock.discovery.mockResolvedValue(
             createMockOpenidClient() as never,
         );
-        joseMock.createRemoteJWKSet.mockReturnValue(jest.fn() as never);
+        joseMock.createRemoteJWKSet.mockReturnValue(vi.fn() as never);
         joseMock.jwtVerify.mockResolvedValue(
             createMockJwtVerifyResult() as never,
         );
@@ -64,8 +55,8 @@ describe('Defauth - Error Handling and Edge Cases', () => {
             sub: 'user123',
             name: 'Test User',
             email: 'test@example.com',
-            iat: 1630000000,
-            exp: 9999999999,
+            iat: 1_630_000_000,
+            exp: 9_999_999_999,
             aud: 'test-client-id',
             iss: 'https://mock-oidc-provider.com',
         } as never);
@@ -79,7 +70,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
     });
 
     afterEach(() => {
-        jest.restoreAllMocks();
+        vi.restoreAllMocks();
     });
 
     describe('Error Handling', () => {
@@ -92,7 +83,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
         describe('General Error Handling', () => {
             it('should handle storage adapter failures', async () => {
                 const storageError = new Error('Storage failed');
-                jest.spyOn(mockStorageAdapter, 'findUser').mockRejectedValue(
+                vi.spyOn(mockStorageAdapter, 'findUser').mockRejectedValue(
                     storageError,
                 );
 
@@ -185,7 +176,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
             });
             it('should log warning when UserInfo endpoint is missing from server metadata', async () => {
                 const mockClientNoUserInfo = {
-                    serverMetadata: jest.fn().mockReturnValue({
+                    serverMetadata: vi.fn().mockReturnValue({
                         jwks_uri: 'https://example.com/.well-known/jwks.json',
                         // No userinfo_endpoint
                     }),
@@ -228,7 +219,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 });
 
                 const mockClientNoUserInfo = {
-                    serverMetadata: jest.fn().mockReturnValue({
+                    serverMetadata: vi.fn().mockReturnValue({
                         jwks_uri: 'https://example.com/.well-known/jwks.json',
                         // No userinfo_endpoint
                     }),

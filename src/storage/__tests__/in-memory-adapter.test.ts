@@ -1,9 +1,9 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import type {
     StorageMetadata,
     TokenContext,
     UserClaims,
 } from '../../types/index.js';
-import { beforeEach, describe, expect, it } from '@jest/globals';
 import { InMemoryStorageAdapter } from '../in-memory-adapter.js';
 
 const createJwtTokenContext = (sub: string): TokenContext => ({
@@ -230,7 +230,7 @@ describe('InMemoryStorageAdapter', () => {
                 picture: 'https://example.com/avatar.jpg',
                 locale: 'en-US',
                 zoneinfo: 'America/New_York',
-                updated_at: 1640995200,
+                updated_at: 1_640_995_200,
                 custom_claim: 'custom_value',
                 nested_object: {
                     key1: 'value1',
@@ -240,8 +240,8 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             const complexMetadata: StorageMetadata = {
-                lastUserInfoRefresh: new Date(1640995200000),
-                lastIntrospection: new Date(1640995200000),
+                lastUserInfoRefresh: new Date(1_640_995_200_000),
+                lastIntrospection: new Date(1_640_995_200_000),
             };
 
             await adapter.storeUser(complexUser, complexUser, complexMetadata);
@@ -370,7 +370,7 @@ describe('InMemoryStorageAdapter', () => {
             };
 
             const existingMetadata: StorageMetadata = {
-                lastUserInfoRefresh: new Date(Date.now() - 10000),
+                lastUserInfoRefresh: new Date(Date.now() - 10_000),
             };
 
             await adapter.storeUser(

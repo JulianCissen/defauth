@@ -1,5 +1,7 @@
 import * as jose from 'jose';
+import type { IntrospectionResponse } from 'oauth4webapi';
 import * as openid from 'openid-client';
+import { InMemoryStorageAdapter } from '../storage/index.js';
 import type {
     AuthenticationMethod,
     CustomValidator,
@@ -14,11 +16,6 @@ import type {
     UserInfoStrategy,
 } from '../types/index.js';
 import {
-    ConsoleLogger,
-    defaultUserInfoRefreshCondition,
-    getTokenType,
-} from '../utils/index.js';
-import {
     CustomValidationError,
     DefauthError,
     InitializationError,
@@ -29,8 +26,11 @@ import {
     UserClaimsSchema,
     UserInfoError,
 } from '../types/index.js';
-import { InMemoryStorageAdapter } from '../storage/index.js';
-import type { IntrospectionResponse } from 'oauth4webapi';
+import {
+    ConsoleLogger,
+    defaultUserInfoRefreshCondition,
+    getTokenType,
+} from '../utils/index.js';
 
 /**
  * Defauth - Main authentication class that handles OIDC authentication and user management
@@ -184,18 +184,23 @@ export class Defauth<TUser> {
      */
     private getAuthenticationMethod() {
         switch (this.authenticationMethod) {
-            case 'client_secret_post':
+            case 'client_secret_post': {
                 return openid.ClientSecretPost(this.clientSecret);
-            case 'client_secret_basic':
+            }
+            case 'client_secret_basic': {
                 return openid.ClientSecretBasic(this.clientSecret);
-            case 'client_secret_jwt':
+            }
+            case 'client_secret_jwt': {
                 return openid.ClientSecretJwt(this.clientSecret);
-            case 'none':
+            }
+            case 'none': {
                 return openid.None();
-            default:
+            }
+            default: {
                 throw new InitializationError(
-                    `Unsupported authentication method: ${this.authenticationMethod}`,
+                    `Unsupported authentication method: ${String(this.authenticationMethod)}`,
                 );
+            }
         }
     }
 
@@ -558,10 +563,7 @@ export class Defauth<TUser> {
         }
 
         try {
-            return (await openid.tokenIntrospection(
-                this.clientConfig,
-                token,
-            )) as IntrospectionResponse;
+            return await openid.tokenIntrospection(this.clientConfig, token);
         } catch (error) {
             throw new IntrospectionError(
                 'Failed to introspect token',
