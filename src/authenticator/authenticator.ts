@@ -1,4 +1,5 @@
 import * as openid from 'openid-client';
+import { InitializationError, TokenValidationError } from '../errors.js';
 import { InMemoryStorageAdapter } from '../storage/index.js';
 import type {
     AuthenticationMethod,
@@ -6,11 +7,7 @@ import type {
     JwtValidationOptions,
     StorageAdapter,
 } from '../types/index.js';
-import {
-    InitializationError,
-    TokenType,
-    TokenValidationError,
-} from '../types/index.js';
+import { TokenType } from '../types/index.js';
 import {
     ConsoleLogger,
     defaultUserInfoRefreshCondition,

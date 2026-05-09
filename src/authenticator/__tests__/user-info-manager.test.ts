@@ -1,7 +1,7 @@
 import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CustomValidationError, UserInfoError } from '../../errors.js';
 import type { StorageMetadata, UserClaims } from '../../types/index.js';
-import { CustomValidationError, UserInfoError } from '../../types/index.js';
 import { defaultUserInfoRefreshCondition } from '../../utils/index.js';
 import { UserInfoManager } from '../user-info-manager.js';
 import {

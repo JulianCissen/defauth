@@ -1,4 +1,5 @@
 import * as openid from 'openid-client';
+import { CustomValidationError, UserInfoError } from '../errors.js';
 import type {
     CustomValidator,
     Logger,
@@ -8,7 +9,6 @@ import type {
     UserInfoRefreshCondition,
     UserInfoStrategy,
 } from '../types/index.js';
-import { CustomValidationError, UserInfoError } from '../types/index.js';
 import {
     combineClaimsWithPriority,
     extractUserClaims,

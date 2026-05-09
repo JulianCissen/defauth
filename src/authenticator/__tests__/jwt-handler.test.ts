@@ -1,8 +1,8 @@
 import * as jose from 'jose';
 import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { JwtVerificationError } from '../../errors.js';
 import type { UserClaims } from '../../types/index.js';
-import { JwtVerificationError } from '../../types/index.js';
 import { defaultUserInfoRefreshCondition } from '../../utils/index.js';
 import { JwtHandler } from '../jwt-handler.js';
 import { UserInfoManager } from '../user-info-manager.js';

@@ -1,12 +1,13 @@
 import * as jose from 'jose';
 import type { IntrospectionResponse } from 'oauth4webapi';
+import { JwtVerificationError } from '../errors.js';
 import type {
     JwtValidationOptions,
     Logger,
     TokenContext,
     UserClaims,
 } from '../types/index.js';
-import { JwtVerificationError, UserClaimsSchema } from '../types/index.js';
+import { UserClaimsSchema } from '../types/index.js';
 import {
     extractFromIntrospection,
     extractFromJwt,

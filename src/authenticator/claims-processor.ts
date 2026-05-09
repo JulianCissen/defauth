@@ -1,5 +1,5 @@
 import type { IntrospectionResponse } from 'oauth4webapi';
-import { TokenValidationError } from '../types/index.js';
+import { TokenValidationError } from '../errors.js';
 import type { UserClaims } from '../types/index.js';
 
 export const JWT_METADATA_CLAIMS = [

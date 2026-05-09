@@ -1,5 +1,10 @@
 import type { IntrospectionResponse } from 'oauth4webapi';
 import * as openid from 'openid-client';
+import {
+    DefauthError,
+    IntrospectionError,
+    TokenValidationError,
+} from '../errors.js';
 import type {
     JwtValidationOptions,
     StorageAdapter,
@@ -7,11 +12,6 @@ import type {
     TokenContext,
     UserClaims,
     UserInfoStrategy,
-} from '../types/index.js';
-import {
-    DefauthError,
-    IntrospectionError,
-    TokenValidationError,
 } from '../types/index.js';
 import { combineClaimsWithPriority } from './claims-processor.js';
 import type { UserInfoManager } from './user-info-manager.js';

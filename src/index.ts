@@ -25,7 +25,7 @@ export {
     UserInfoError,
     IntrospectionError,
     JwtVerificationError,
-} from './types/index.js';
+} from './errors.js';
 
 // Storage adapter exports
 export { InMemoryStorageAdapter } from './storage/index.js';
