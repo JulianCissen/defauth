@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UserClaims } from '../../types/index.js';
-import { Defauth } from '../defauth.js';
+import { Defauth } from '../authenticator.js';
 import {
     MOCK_CLIENT_ID,
     MOCK_INTROSPECTION_ACTIVE,
@@ -287,6 +287,85 @@ describe('Defauth - Configuration Options and Validation', () => {
                     requiredClaims: ['sub', 'aud', 'iss'],
                 }),
             );
+        });
+    });
+
+    describe('enableIntrospectionFallthrough precedence', () => {
+        it('should fall through to introspection by default when neither setting is provided', async () => {
+            joseMock.jwtVerify.mockRejectedValueOnce(new Error('sig failed'));
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig<UserClaims>({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            const result = await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(openidMock.tokenIntrospection).toHaveBeenCalled();
+            expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
+        });
+
+        it('should fall through when disableIntrospectionFallthrough is false (legacy)', async () => {
+            joseMock.jwtVerify.mockRejectedValueOnce(new Error('sig failed'));
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig<UserClaims>({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                    disableIntrospectionFallthrough: false,
+                }),
+            );
+
+            const result = await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(openidMock.tokenIntrospection).toHaveBeenCalled();
+            expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
+        });
+
+        it('should not fall through when disableIntrospectionFallthrough is true (legacy)', async () => {
+            joseMock.jwtVerify.mockRejectedValueOnce(new Error('sig failed'));
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig<UserClaims>({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                    disableIntrospectionFallthrough: true,
+                }),
+            );
+
+            await expect(defauth.getUser(MOCK_JWT_TOKEN)).rejects.toThrow();
+            expect(openidMock.tokenIntrospection).not.toHaveBeenCalled();
+        });
+
+        it('should use enableIntrospectionFallthrough over disableIntrospectionFallthrough when both are set', async () => {
+            joseMock.jwtVerify.mockRejectedValueOnce(new Error('sig failed'));
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig<UserClaims>({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                    enableIntrospectionFallthrough: true,
+                    disableIntrospectionFallthrough: true, // should be ignored
+                }),
+            );
+
+            const result = await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(openidMock.tokenIntrospection).toHaveBeenCalled();
+            expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
+        });
+
+        it('should disable fallthrough when enableIntrospectionFallthrough is false, overriding the legacy setting', async () => {
+            joseMock.jwtVerify.mockRejectedValueOnce(new Error('sig failed'));
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig<UserClaims>({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                    enableIntrospectionFallthrough: false,
+                    disableIntrospectionFallthrough: false, // should be ignored
+                }),
+            );
+
+            await expect(defauth.getUser(MOCK_JWT_TOKEN)).rejects.toThrow();
+            expect(openidMock.tokenIntrospection).not.toHaveBeenCalled();
         });
     });
 

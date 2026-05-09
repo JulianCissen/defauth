@@ -20,7 +20,7 @@ export class InMemoryStorageAdapter<
      * @param context - The token validation context with full token information
      * @returns Promise resolving to user record and metadata, or null if not found
      */
-    async findUser(context: TokenContext): Promise<{
+    public async findUser(context: TokenContext): Promise<{
         user: TUser;
         metadata: StorageMetadata;
     } | null> {
@@ -32,9 +32,9 @@ export class InMemoryStorageAdapter<
      * @param user - The user record to store (null for new users)
      * @param newClaims - The new claims to merge with the user record
      * @param metadata - Storage metadata (timestamps, etc.)
-     * @returns Promise resolving to the stored user and metadata
+     * @returns Promise resolving to the stored user
      */
-    async storeUser(
+    public async storeUser(
         user: TUser | null,
         newClaims: UserClaims,
         metadata: StorageMetadata,
@@ -53,7 +53,7 @@ export class InMemoryStorageAdapter<
     /**
      * Clear all stored users (useful for testing)
      */
-    clear(): void {
+    public clear(): void {
         this.users.clear();
     }
 
@@ -61,7 +61,7 @@ export class InMemoryStorageAdapter<
      * Get all stored users (useful for debugging)
      * @returns Array of all user records with metadata
      */
-    getAllUsers(): Array<{ user: TUser; metadata: StorageMetadata }> {
+    public getAllUsers(): Array<{ user: TUser; metadata: StorageMetadata }> {
         return [...this.users.values()];
     }
 }

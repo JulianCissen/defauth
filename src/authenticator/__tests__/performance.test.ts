@@ -2,7 +2,7 @@ import * as jose from 'jose';
 import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DefauthConfig, UserClaims } from '../../types/index.js';
-import { Defauth } from '../defauth.js';
+import { Defauth } from '../authenticator.js';
 import {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,

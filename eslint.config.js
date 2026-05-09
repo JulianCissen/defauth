@@ -2,6 +2,7 @@
 import tseslint from 'typescript-eslint';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 import importX from 'eslint-plugin-import-x';
+import jsdoc from 'eslint-plugin-jsdoc';
 import unicorn from 'eslint-plugin-unicorn';
 import prettierConfig from 'eslint-plugin-prettier/recommended';
 import packageJsonPlugin from 'eslint-plugin-package-json';
@@ -83,6 +84,34 @@ export default tseslint.config(
         rules: {
             // Async interface implementations legitimately have no await
             '@typescript-eslint/require-await': 'off',
+        },
+    },
+
+    // 5a. JSDoc enforcement — recommended TypeScript preset
+    {
+        files: ['src/**/*.ts'],
+        ignores: ['src/**/__tests__/**'],
+        ...jsdoc.configs['flat/recommended-typescript-error'],
+        rules: {
+            ...jsdoc.configs['flat/recommended-typescript-error'].rules,
+            'jsdoc/require-param': ['error', { checkDestructured: false }],
+            'jsdoc/check-param-names': ['error', { checkDestructured: false }],
+        },
+    },
+
+    // 5b. Accessibility modifiers on class members
+    {
+        files: ['src/**/*.ts'],
+        ignores: ['src/**/__tests__/**'],
+        rules: {
+            '@typescript-eslint/explicit-member-accessibility': [
+                'error',
+                { accessibility: 'explicit' },
+            ],
+            '@typescript-eslint/parameter-properties': [
+                'error',
+                { prefer: 'class-property' },
+            ],
         },
     },
 

@@ -7,7 +7,7 @@ import type {
     StorageMetadata,
     UserClaims,
 } from '../../types/index.js';
-import { Defauth } from '../defauth.js';
+import { Defauth } from '../authenticator.js';
 import {
     MOCK_INTROSPECTION_ACTIVE,
     MOCK_JWT_TOKEN,

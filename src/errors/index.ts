@@ -3,10 +3,11 @@
  */
 export class DefauthError extends Error {
     /**
+     * Creates a new DefauthError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(cause ? `${message}: ${cause.message}` : message);
         this.name = 'DefauthError';
         this.cause = cause;
@@ -18,10 +19,11 @@ export class DefauthError extends Error {
  */
 export class InitializationError extends DefauthError {
     /**
+     * Creates a new InitializationError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'InitializationError';
     }
@@ -32,10 +34,11 @@ export class InitializationError extends DefauthError {
  */
 export class TokenValidationError extends DefauthError {
     /**
+     * Creates a new TokenValidationError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'TokenValidationError';
     }
@@ -46,10 +49,11 @@ export class TokenValidationError extends DefauthError {
  */
 export class UserInfoError extends DefauthError {
     /**
+     * Creates a new UserInfoError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'UserInfoError';
     }
@@ -60,10 +64,11 @@ export class UserInfoError extends DefauthError {
  */
 export class IntrospectionError extends DefauthError {
     /**
+     * Creates a new IntrospectionError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'IntrospectionError';
     }
@@ -74,10 +79,11 @@ export class IntrospectionError extends DefauthError {
  */
 export class JwtVerificationError extends TokenValidationError {
     /**
+     * Creates a new JwtVerificationError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'JwtVerificationError';
     }
@@ -88,10 +94,11 @@ export class JwtVerificationError extends TokenValidationError {
  */
 export class CustomValidationError extends TokenValidationError {
     /**
+     * Creates a new CustomValidationError.
      * @param message - Error message
      * @param cause - The original error that caused this error
      */
-    constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: Error) {
         super(message, cause);
         this.name = 'CustomValidationError';
     }

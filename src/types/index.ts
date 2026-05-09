@@ -132,7 +132,7 @@ export type AuthenticationMethod =
  * Custom validator function type for adding custom authentication/authorization logic
  * @param userClaims - The user claims extracted from the token
  * @returns Promise resolving to void if validation passes
- * @throws Error if validation fails
+ * @throws {Error} if validation fails
  */
 export type CustomValidator = (userClaims: UserClaims) => Promise<void> | void;
 
@@ -196,11 +196,16 @@ interface BaseDefauthConfig<TUser> {
      */
     allowInsecureRequests?: boolean;
     /**
-     * Disable automatic introspection fallback when JWT verification fails
-     * When true, JWT verification failures will throw an error instead of falling back to introspection
-     * (defaults to false)
+     * @deprecated Use `enableIntrospectionFallthrough` instead.
+     * Ignored when `enableIntrospectionFallthrough` is defined.
      */
     disableIntrospectionFallthrough?: boolean;
+    /**
+     * Allow automatic introspection fallback when JWT signature verification fails.
+     * When defined, takes precedence over `disableIntrospectionFallthrough`.
+     * Defaults to `true` when neither setting is provided.
+     */
+    enableIntrospectionFallthrough?: boolean;
 }
 
 /**

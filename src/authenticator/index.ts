@@ -1,1 +1,1 @@
-export { Defauth } from './defauth.js';
+export { Defauth } from './authenticator.js';

@@ -10,7 +10,7 @@ export class ConsoleLogger implements Logger {
      * @param message - The log message
      * @param context - Optional context object with additional information
      */
-    log(
+    public log(
         level: LogLevel,
         message: string,
         context?: Record<string, unknown>,
