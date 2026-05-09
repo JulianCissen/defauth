@@ -1,5 +1,10 @@
 import * as openid from 'openid-client';
-import { CustomValidationError, UserInfoError } from '../errors.js';
+import {
+    CustomValidationError,
+    DefauthError,
+    StorageError,
+    UserInfoError,
+} from '../errors.js';
 import type {
     CustomValidator,
     Logger,
@@ -61,10 +66,8 @@ export class UserInfoManager<TUser> {
 
             return extractUserClaims(userInfoResponse);
         } catch (error) {
-            throw new UserInfoError(
-                'Failed to fetch user info',
-                error as Error,
-            );
+            if (error instanceof DefauthError) throw error;
+            throw new UserInfoError('Failed to fetch user info', error);
         }
     }
 
@@ -101,22 +104,27 @@ export class UserInfoManager<TUser> {
         try {
             return await this.fetchUserInfo(token, sub);
         } catch (error) {
-            this.handleFailure(error as Error, context);
+            this.handleFailure(error, context);
             return null;
         }
     }
 
     private handleFailure(
-        error: Error,
+        error: unknown,
         context?: Record<string, unknown>,
     ): void {
         const message = 'Failed to fetch UserInfo';
 
         if (this.config.throwOnUserInfoFailure) {
+            if (error instanceof DefauthError) throw error;
             throw new UserInfoError(message, error);
         }
 
-        this.config.logger.log('warn', `${message}: ${error.message}`, context);
+        this.config.logger.log(
+            'warn',
+            `${message}: ${error instanceof Error ? error.message : String(error)}`,
+            context,
+        );
     }
 
     /**
@@ -148,11 +156,15 @@ export class UserInfoManager<TUser> {
             options,
         );
         await this.runCustomValidation(finalClaims, options.customValidator);
-        return this.config.storageAdapter.storeUser(
-            options.userRecord,
-            finalClaims,
-            options.userMetadata,
-        );
+        try {
+            return await this.config.storageAdapter.storeUser(
+                options.userRecord,
+                finalClaims,
+                options.userMetadata,
+            );
+        } catch (error) {
+            throw new StorageError('Failed to write to storage adapter', error);
+        }
     }
 
     private async enrichWithUserInfo(
@@ -198,10 +210,7 @@ export class UserInfoManager<TUser> {
         try {
             await customValidator(claims);
         } catch (error) {
-            throw new CustomValidationError(
-                'Custom validation failed',
-                error as Error,
-            );
+            throw new CustomValidationError('Custom validation failed', error);
         }
     }
 }

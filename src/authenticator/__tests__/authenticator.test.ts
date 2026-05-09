@@ -92,7 +92,7 @@ describe('Defauth - Initialization and Lifecycle', () => {
             );
 
             await expect(Defauth.create(mockConfig)).rejects.toThrow(
-                'Failed to discover OIDC issuer or create client: Discovery failed',
+                'Failed to discover OIDC issuer or create client',
             );
         });
 

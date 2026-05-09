@@ -2,15 +2,9 @@
  * Base error class for all Defauth errors
  */
 export class DefauthError extends Error {
-    /**
-     * Creates a new DefauthError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
-        super(cause ? `${message}: ${cause.message}` : message);
+    public constructor(message: string, cause?: unknown) {
+        super(message, { cause });
         this.name = 'DefauthError';
-        this.cause = cause;
     }
 }
 
@@ -18,12 +12,7 @@ export class DefauthError extends Error {
  * Error thrown when OIDC client initialization fails
  */
 export class InitializationError extends DefauthError {
-    /**
-     * Creates a new InitializationError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'InitializationError';
     }
@@ -33,12 +22,7 @@ export class InitializationError extends DefauthError {
  * Error thrown when token validation fails
  */
 export class TokenValidationError extends DefauthError {
-    /**
-     * Creates a new TokenValidationError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'TokenValidationError';
     }
@@ -48,12 +32,7 @@ export class TokenValidationError extends DefauthError {
  * Error thrown when user info fetching fails
  */
 export class UserInfoError extends DefauthError {
-    /**
-     * Creates a new UserInfoError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'UserInfoError';
     }
@@ -63,12 +42,7 @@ export class UserInfoError extends DefauthError {
  * Error thrown when token introspection fails
  */
 export class IntrospectionError extends DefauthError {
-    /**
-     * Creates a new IntrospectionError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'IntrospectionError';
     }
@@ -78,12 +52,7 @@ export class IntrospectionError extends DefauthError {
  * Error thrown when JWT signature verification fails
  */
 export class JwtVerificationError extends TokenValidationError {
-    /**
-     * Creates a new JwtVerificationError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'JwtVerificationError';
     }
@@ -93,13 +62,18 @@ export class JwtVerificationError extends TokenValidationError {
  * Error thrown when custom validation fails
  */
 export class CustomValidationError extends TokenValidationError {
-    /**
-     * Creates a new CustomValidationError.
-     * @param message - Error message
-     * @param cause - The original error that caused this error
-     */
-    public constructor(message: string, cause?: Error) {
+    public constructor(message: string, cause?: unknown) {
         super(message, cause);
         this.name = 'CustomValidationError';
+    }
+}
+
+/**
+ * Error thrown when the storage adapter fails
+ */
+export class StorageError extends DefauthError {
+    public constructor(message: string, cause?: unknown) {
+        super(message, cause);
+        this.name = 'StorageError';
     }
 }

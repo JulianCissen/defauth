@@ -108,13 +108,12 @@ export class Defauth<TUser> {
     private async initializeClient(
         config: DefauthConfig<TUser>,
     ): Promise<void> {
+        const authMethod = this.getAuthenticationMethod();
+        const executeOptions = this.allowInsecureRequests
+            ? [openid.allowInsecureRequests]
+            : [];
+
         try {
-            const executeOptions = this.allowInsecureRequests
-                ? [openid.allowInsecureRequests]
-                : [];
-
-            const authMethod = this.getAuthenticationMethod();
-
             this.clientConfig = await openid.discovery(
                 new URL(config.issuer),
                 this.clientId,
@@ -125,7 +124,7 @@ export class Defauth<TUser> {
         } catch (error) {
             throw new InitializationError(
                 'Failed to discover OIDC issuer or create client',
-                error as Error,
+                error,
             );
         }
 

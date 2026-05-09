@@ -1,6 +1,7 @@
 import * as jose from 'jose';
 import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StorageError } from '../../errors.js';
 import type { DefauthConfig, UserClaims } from '../../types/index.js';
 import { Defauth } from '../authenticator.js';
 import {
@@ -89,7 +90,10 @@ describe('Defauth - Error Handling and Edge Cases', () => {
 
                 await expect(
                     authenticator.getUser(MOCK_JWT_TOKEN),
-                ).rejects.toThrow('Storage failed');
+                ).rejects.toThrow(StorageError);
+                await expect(
+                    authenticator.getUser(MOCK_JWT_TOKEN),
+                ).rejects.toThrow('Failed to read from storage adapter');
             });
 
             it('should handle network failures gracefully', async () => {
@@ -160,7 +164,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 );
 
                 await expect(Defauth.create(mockConfig)).rejects.toThrow(
-                    'Failed to discover OIDC issuer or create client: Discovery failed',
+                    'Failed to discover OIDC issuer or create client',
                 );
             });
 
@@ -171,7 +175,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 );
 
                 await expect(Defauth.create(mockConfig)).rejects.toThrow(
-                    'Failed to discover OIDC issuer or create client: Discovery failed',
+                    'Failed to discover OIDC issuer or create client',
                 );
             });
             it('should log warning when UserInfo endpoint is missing from server metadata', async () => {
@@ -206,7 +210,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 const warningLog = mockLogger.getLogsForLevel('warn')[0];
                 if (warningLog) {
                     expect(warningLog.message).toContain(
-                        'Failed to fetch UserInfo: Failed to fetch user info: No UserInfo endpoint found in server metadata',
+                        'Failed to fetch UserInfo: No UserInfo endpoint found in server metadata',
                     );
                 }
             });
@@ -244,7 +248,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 await expect(
                     noUserInfoAuth.getUser(MOCK_JWT_TOKEN),
                 ).rejects.toThrow(
-                    'Failed to fetch UserInfo: Failed to fetch user info: No UserInfo endpoint found in server metadata',
+                    'No UserInfo endpoint found in server metadata',
                 );
             });
         });
@@ -353,7 +357,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 );
 
                 await expect(throwAuth.getUser(MOCK_JWT_TOKEN)).rejects.toThrow(
-                    'Failed to fetch UserInfo: Failed to fetch user info: UserInfo failed',
+                    'Failed to fetch user info',
                 );
             });
         });
@@ -529,7 +533,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
                 );
 
                 await expect(Defauth.create(mockConfig)).rejects.toThrow(
-                    'Failed to discover OIDC issuer or create client: Discovery failed',
+                    'Failed to discover OIDC issuer or create client',
                 );
             });
 

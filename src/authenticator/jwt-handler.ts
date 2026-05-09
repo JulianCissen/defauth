@@ -1,6 +1,6 @@
 import * as jose from 'jose';
 import type { IntrospectionResponse } from 'oauth4webapi';
-import { JwtVerificationError } from '../errors.js';
+import { DefauthError, JwtVerificationError } from '../errors.js';
 import type {
     JwtValidationOptions,
     Logger,
@@ -68,14 +68,26 @@ export class JwtHandler<TUser> extends TokenHandler<TUser> {
                     token,
                     mergedOptions,
                 );
-                const payload = UserClaimsSchema.parse(verifiedPayload);
-                return { type: 'jwt', payload };
+                try {
+                    const payload = UserClaimsSchema.parse(verifiedPayload);
+                    return { type: 'jwt', payload };
+                } catch (parseError) {
+                    throw new JwtVerificationError(
+                        'JWT payload validation failed',
+                        parseError,
+                    );
+                }
             } catch (error) {
                 if (!this.config.enableIntrospectionFallthrough) throw error;
                 this.config.logger.log(
                     'warn',
                     'JWT verification failed, falling back to introspection',
-                    { error: (error as Error).message },
+                    {
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                    },
                 );
             }
         }
@@ -103,9 +115,10 @@ export class JwtHandler<TUser> extends TokenHandler<TUser> {
                 audience: this.config.audience,
             });
         } catch (error) {
+            if (error instanceof DefauthError) throw error;
             throw new JwtVerificationError(
                 'JWT signature verification failed',
-                error as Error,
+                error,
             );
         }
     }

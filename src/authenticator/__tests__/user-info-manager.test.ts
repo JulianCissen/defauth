@@ -292,7 +292,7 @@ describe('UserInfoManager', () => {
                             userMetadata: {},
                         },
                     ),
-                ).rejects.toThrow('Failed to fetch UserInfo');
+                ).rejects.toThrow('Failed to fetch user info');
             });
 
             it('should set lastUserInfoRefresh after successful fetch', async () => {

@@ -3,6 +3,7 @@ import * as openid from 'openid-client';
 import {
     DefauthError,
     IntrospectionError,
+    StorageError,
     TokenValidationError,
 } from '../errors.js';
 import type {
@@ -76,7 +77,7 @@ export abstract class TokenHandler<TUser> {
             if (error instanceof DefauthError) throw error;
             throw new TokenValidationError(
                 `Failed to process ${this.tokenType} token`,
-                error as Error,
+                error,
             );
         }
     }
@@ -93,10 +94,7 @@ export abstract class TokenHandler<TUser> {
         try {
             return await openid.tokenIntrospection(this.clientConfig, token);
         } catch (error) {
-            throw new IntrospectionError(
-                'Failed to introspect token',
-                error as Error,
-            );
+            throw new IntrospectionError('Failed to introspect token', error);
         }
     }
 
@@ -126,9 +124,16 @@ export abstract class TokenHandler<TUser> {
         context: TokenContext,
         usedIntrospection: boolean,
     ): Promise<{ user: TUser | null; metadata: StorageMetadata }> {
-        const record = await this.storageAdapter.findUser(context);
-        const metadata = record?.metadata ?? {};
-        if (usedIntrospection) metadata.lastIntrospection = new Date();
-        return { user: record?.user ?? null, metadata };
+        try {
+            const record = await this.storageAdapter.findUser(context);
+            const metadata = record?.metadata ?? {};
+            if (usedIntrospection) metadata.lastIntrospection = new Date();
+            return { user: record?.user ?? null, metadata };
+        } catch (error) {
+            throw new StorageError(
+                'Failed to read from storage adapter',
+                error,
+            );
+        }
     }
 }

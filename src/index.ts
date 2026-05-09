@@ -21,10 +21,11 @@ export {
     CustomValidationError,
     DefauthError,
     InitializationError,
-    TokenValidationError,
-    UserInfoError,
     IntrospectionError,
     JwtVerificationError,
+    StorageError,
+    TokenValidationError,
+    UserInfoError,
 } from './errors.js';
 
 // Storage adapter exports
