@@ -155,6 +155,20 @@ describe('Defauth - Initialization and Lifecycle', () => {
             await authenticator.getUser(MOCK_JWT_TOKEN);
             expect(openidMock.discovery).toHaveBeenCalledTimes(1);
         });
+
+        it('should call discovery exactly once when concurrent requests race on cold start', async () => {
+            // Bypass private constructor to get an uninitialized authenticator
+            const authenticator = new (Defauth as any)(
+                mockConfig,
+            ) as Defauth<UserClaims>;
+
+            await Promise.all([
+                authenticator.getUser(MOCK_JWT_TOKEN),
+                authenticator.getUser(MOCK_JWT_TOKEN),
+            ]);
+
+            expect(openidMock.discovery).toHaveBeenCalledTimes(1);
+        });
     });
 
     describe('clearCache', () => {
@@ -165,6 +179,32 @@ describe('Defauth - Initialization and Lifecycle', () => {
             const authenticator = await Defauth.create(inMemoryConfig);
 
             await authenticator.getUser(MOCK_JWT_TOKEN);
+            await expect(authenticator.clearCache()).resolves.not.toThrow();
+        });
+
+        it('should call clear() on a custom adapter that implements it', async () => {
+            const clearFn = vi.fn().mockImplementation(() => Promise.resolve());
+            const customAdapter = new MockStorageAdapter<UserClaims>();
+            (customAdapter as any).clear = clearFn;
+
+            const authenticator = await Defauth.create(
+                createMockConfig({ storageAdapter: customAdapter }),
+            );
+            await authenticator.clearCache();
+
+            expect(clearFn).toHaveBeenCalledTimes(1);
+        });
+
+        it('should resolve without throwing when adapter has no clear() method', async () => {
+            const adapterWithoutClear = {
+                findUser: async () => null,
+                storeUser: async (_: UserClaims | null, claims: UserClaims) =>
+                    claims,
+            };
+
+            const authenticator = await Defauth.create(
+                createMockConfig({ storageAdapter: adapterWithoutClear }),
+            );
             await expect(authenticator.clearCache()).resolves.not.toThrow();
         });
     });

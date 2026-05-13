@@ -53,7 +53,7 @@ export class InMemoryStorageAdapter<
     /**
      * Clear all stored users (useful for testing)
      */
-    public clear(): void {
+    public async clear(): Promise<void> {
         this.users.clear();
     }
 

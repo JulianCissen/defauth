@@ -148,7 +148,7 @@ export class MockStorageAdapter<
         this.storage.set(userClaims.sub, { user, metadata });
     }
 
-    clear(): void {
+    async clear(): Promise<void> {
         this.storage.clear();
         this.findUserCalls = [];
         this.storeUserCalls = [];

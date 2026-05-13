@@ -119,7 +119,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.fetchUserInfo.mockClear();
 
                 // Ensure UserInfo will be fetched by clearing storage
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_OPAQUE_TOKEN);
 
@@ -133,7 +133,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.fetchUserInfo.mockClear();
 
                 // Ensure UserInfo refresh is needed by clearing storage
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_JWT_TOKEN);
 
@@ -165,7 +165,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.fetchUserInfo.mockClear();
 
                 // Ensure UserInfo refresh is needed by clearing storage
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_OPAQUE_TOKEN);
 
@@ -182,7 +182,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.tokenIntrospection.mockClear();
 
                 // Ensure UserInfo refresh is needed by clearing storage
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_JWT_TOKEN, {
                     forceIntrospection: true,
@@ -216,7 +216,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.fetchUserInfo.mockClear();
 
                 // Ensure both calls are needed
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_OPAQUE_TOKEN);
 
@@ -229,7 +229,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 openidMock.fetchUserInfo.mockClear();
 
                 // Ensure both calls are needed
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 await authenticator.getUser(MOCK_JWT_TOKEN, {
                     forceIntrospection: true,
@@ -268,7 +268,7 @@ describe('Defauth - Performance and API Call Optimization', () => {
                 );
 
                 // Ensure UserInfo is attempted
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 const result = await authenticator.getUser(MOCK_OPAQUE_TOKEN);
 

@@ -52,12 +52,13 @@ export abstract class TokenHandler<TUser> {
                 token,
                 options,
             );
-            const enrichedClaims = await this.fetchUserInfoBeforeRetrieval(
-                token,
-                claims,
-                context,
-                options,
-            );
+            const { enrichedClaims, userInfoAttempted } =
+                await this.fetchUserInfoBeforeRetrieval(
+                    token,
+                    claims,
+                    context,
+                    options,
+                );
             const { user, metadata } = await this.loadUserRecord(
                 context,
                 usedIntrospection,
@@ -69,7 +70,7 @@ export abstract class TokenHandler<TUser> {
                     tokenType: this.tokenType,
                     userRecord: user,
                     userMetadata: metadata,
-                    userInfoAlreadyFetched: !!context.userInfoResult,
+                    userInfoAlreadyFetched: userInfoAttempted,
                     customValidator: options?.customValidator,
                 },
             );
@@ -103,8 +104,10 @@ export abstract class TokenHandler<TUser> {
         userClaims: UserClaims,
         tokenContext: TokenContext,
         options?: JwtValidationOptions,
-    ): Promise<UserClaims> {
-        if (this.userInfoStrategy !== 'beforeUserRetrieval') return userClaims;
+    ): Promise<{ enrichedClaims: UserClaims; userInfoAttempted: boolean }> {
+        if (this.userInfoStrategy !== 'beforeUserRetrieval')
+            return { enrichedClaims: userClaims, userInfoAttempted: false };
+
         const userInfoClaims = await this.userInfoManager.tryFetchUserInfo(
             token,
             userClaims.sub,
@@ -115,9 +118,14 @@ export abstract class TokenHandler<TUser> {
                 forceIntrospection: options?.forceIntrospection,
             },
         );
-        if (!userInfoClaims) return userClaims;
-        tokenContext.userInfoResult = userInfoClaims;
-        return combineClaimsWithPriority(userClaims, userInfoClaims);
+        if (userInfoClaims) tokenContext.userInfoResult = userInfoClaims;
+
+        return {
+            enrichedClaims: userInfoClaims
+                ? combineClaimsWithPriority(userClaims, userInfoClaims)
+                : userClaims,
+            userInfoAttempted: true,
+        };
     }
 
     private async loadUserRecord(

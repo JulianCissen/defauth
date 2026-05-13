@@ -343,6 +343,30 @@ describe('JwtHandler', () => {
             expect(ctx?.userInfoResult).toEqual(MOCK_USERINFO_RESPONSE);
         });
 
+        it('should not retry UserInfo fetch when the first attempt fails in beforeUserRetrieval', async () => {
+            openidMock.fetchUserInfo.mockRejectedValueOnce(
+                new Error('UserInfo failed'),
+            );
+
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+                logger: mockLogger,
+                userInfoStrategy: 'beforeUserRetrieval',
+                userInfoManager: new UserInfoManager({
+                    clientConfig: createMockOpenidClient() as never,
+                    logger: mockLogger,
+                    throwOnUserInfoFailure: false,
+                    userInfoStrategy: 'beforeUserRetrieval',
+                    userInfoRefreshCondition: defaultUserInfoRefreshCondition,
+                    storageAdapter: mockStorageAdapter,
+                }),
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(openidMock.fetchUserInfo).toHaveBeenCalledTimes(1);
+        });
+
         it('should combine JWT and UserInfo claims with UserInfo taking priority', async () => {
             const jwtPayload = {
                 ...MOCK_JWT_PAYLOAD,

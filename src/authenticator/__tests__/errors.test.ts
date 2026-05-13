@@ -516,7 +516,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
 
             it('should create new user when no existing record is found', async () => {
                 // Ensure no existing user
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 const result = await authenticator.getUser(MOCK_JWT_TOKEN);
 
@@ -551,7 +551,7 @@ describe('Defauth - Error Handling and Edge Cases', () => {
 
             it('should continue with token claims when UserInfo fails for opaque tokens', async () => {
                 // Ensure no existing user
-                mockStorageAdapter.clear();
+                await mockStorageAdapter.clear();
 
                 // Mock UserInfo failure
                 openidMock.fetchUserInfo.mockRejectedValue(

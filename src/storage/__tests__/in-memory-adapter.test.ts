@@ -153,7 +153,7 @@ describe('InMemoryStorageAdapter', () => {
             ).toBeTruthy();
 
             // Clear all users
-            adapter.clear();
+            await adapter.clear();
 
             // Verify users are removed
             expect(
@@ -167,7 +167,7 @@ describe('InMemoryStorageAdapter', () => {
         it('should not affect subsequent store operations', async () => {
             // Store, clear, then store again
             await adapter.storeUser(mockUser, mockUser, {});
-            adapter.clear();
+            await adapter.clear();
             await adapter.storeUser(mockUser, mockUser, {});
 
             const result = await adapter.findUser(
@@ -324,7 +324,7 @@ describe('InMemoryStorageAdapter', () => {
             await adapter.storeUser(mockUser, mockUser, {});
             expect(adapter.getAllUsers()).toHaveLength(1);
 
-            adapter.clear();
+            await adapter.clear();
             expect(adapter.getAllUsers()).toEqual([]);
         });
     });

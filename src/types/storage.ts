@@ -63,4 +63,10 @@ export interface StorageAdapter<TUser> {
         newClaims: UserClaims,
         metadata: StorageMetadata,
     ): Promise<TUser>;
+
+    /**
+     * Clear all cached user data, if supported by the adapter.
+     * Called by `Defauth.clearCache()`.
+     */
+    clear?(): Promise<void>;
 }

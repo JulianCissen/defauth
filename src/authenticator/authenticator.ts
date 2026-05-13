@@ -39,6 +39,7 @@ function resolveIntrospectionFallthrough(
  */
 export class Defauth<TUser> {
     private clientConfig?: openid.Configuration;
+    private initializationPromise: Promise<void> | null = null;
     private jwtHandler?: JwtHandler<TUser>;
     private opaqueHandler?: OpaqueHandler<TUser>;
     private storageAdapter: StorageAdapter<TUser>;
@@ -100,9 +101,7 @@ export class Defauth<TUser> {
      * Clears the in-memory user cache if the configured storage adapter supports it.
      */
     public async clearCache(): Promise<void> {
-        if (this.storageAdapter instanceof InMemoryStorageAdapter) {
-            this.storageAdapter.clear();
-        }
+        await this.storageAdapter.clear?.();
     }
 
     private async initializeClient(
@@ -176,7 +175,10 @@ export class Defauth<TUser> {
 
     private async ensureInitialized(): Promise<void> {
         if (!this.clientConfig && this.initializationConfig) {
-            await this.initializeClient(this.initializationConfig);
+            this.initializationPromise ??= this.initializeClient(
+                this.initializationConfig,
+            );
+            await this.initializationPromise;
         }
 
         if (!this.clientConfig) {

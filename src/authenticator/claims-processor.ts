@@ -35,13 +35,10 @@ export function extractUserClaims(
     }
 
     const userClaims: UserClaims = { sub };
+    const metadataSet = new Set(metadataClaims);
 
     for (const [key, value] of Object.entries(payload)) {
-        if (
-            key !== 'sub' &&
-            !metadataClaims.includes(key) &&
-            value !== undefined
-        ) {
+        if (key !== 'sub' && !metadataSet.has(key) && value !== undefined) {
             userClaims[key] = value;
         }
     }
