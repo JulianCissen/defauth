@@ -37,6 +37,7 @@ export {
     getTokenType,
     defaultUserInfoRefreshCondition,
     ConsoleLogger,
+    DEFAULT_JWT_ALGORITHMS,
 } from './utils/index.js';
 
 export {

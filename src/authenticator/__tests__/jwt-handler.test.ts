@@ -3,7 +3,10 @@ import * as openid from 'openid-client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { JwtVerificationError } from '../../errors.js';
 import type { UserClaims } from '../../types/index.js';
-import { defaultUserInfoRefreshCondition } from '../../utils/index.js';
+import {
+    DEFAULT_JWT_ALGORITHMS,
+    defaultUserInfoRefreshCondition,
+} from '../../utils/index.js';
 import { JwtHandler } from '../jwt-handler.js';
 import { UserInfoManager } from '../user-info-manager.js';
 import {
@@ -113,6 +116,7 @@ describe('JwtHandler', () => {
                     clockTolerance: '1 minute',
                     requiredClaims: ['sub', 'exp'],
                     audience: MOCK_CLIENT_ID,
+                    algorithms: DEFAULT_JWT_ALGORITHMS,
                 }),
             );
             expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
@@ -313,6 +317,61 @@ describe('JwtHandler', () => {
             expect(openidMock.tokenIntrospection).toHaveBeenCalled();
             expect(joseMock.jwtVerify).not.toHaveBeenCalled();
             expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
+        });
+    });
+
+    describe('algorithms option', () => {
+        it('should pass DEFAULT_JWT_ALGORITHMS when no algorithms option is set', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    algorithms: DEFAULT_JWT_ALGORITHMS,
+                }),
+            );
+        });
+
+        it('should pass custom algorithms from globalJwtValidationOptions', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+                globalJwtValidationOptions: {
+                    requiredClaims: ['sub', 'exp'],
+                    clockTolerance: '1 minute',
+                    algorithms: ['ES256', 'ES384'],
+                },
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    algorithms: ['ES256', 'ES384'],
+                }),
+            );
+        });
+
+        it('should pass per-call algorithms overriding the global default', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN, { algorithms: ['RS256'] });
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    algorithms: ['RS256'],
+                }),
+            );
         });
     });
 

@@ -48,6 +48,12 @@ export interface JwtValidationOptions {
     requiredClaims?: string[];
     /** Custom validator function to apply additional authentication/authorization logic */
     customValidator?: CustomValidator;
+    /**
+     * Accepted JWS algorithms for JWT signature verification.
+     * Defaults to asymmetric algorithms only (RS*, PS*, ES*, EdDSA).
+     * Symmetric algorithms (HS*) are excluded by default to prevent algorithm confusion attacks.
+     */
+    algorithms?: string[];
 }
 
 /**

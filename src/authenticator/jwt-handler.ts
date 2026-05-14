@@ -8,6 +8,7 @@ import type {
     UserClaims,
 } from '../types/index.js';
 import { UserClaimsSchema } from '../types/index.js';
+import { DEFAULT_JWT_ALGORITHMS } from '../utils/constants.js';
 import {
     extractFromIntrospection,
     extractFromJwt,
@@ -113,6 +114,7 @@ export class JwtHandler<TUser> extends TokenHandler<TUser> {
                 clockTolerance: options?.clockTolerance,
                 requiredClaims: options?.requiredClaims,
                 audience: this.config.audience,
+                algorithms: options?.algorithms ?? DEFAULT_JWT_ALGORITHMS,
             });
         } catch (error) {
             if (error instanceof DefauthError) throw error;
