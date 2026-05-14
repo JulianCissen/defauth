@@ -6,6 +6,7 @@ import { Defauth } from '../authenticator.js';
 import {
     MOCK_CLIENT_ID,
     MOCK_INTROSPECTION_ACTIVE,
+    MOCK_ISSUER,
     MOCK_JWT_TOKEN,
     MOCK_USERINFO_RESPONSE,
     MOCK_USER_CLAIMS,
@@ -393,7 +394,7 @@ describe('Defauth - Configuration Options and Validation', () => {
             const customAudience = 'https://api.example.com';
             const defauth = await Defauth.create<UserClaims>(
                 createMockConfig({
-                    audience: customAudience,
+                    jwtValidationOptions: { audience: customAudience },
                     storageAdapter: mockStorageAdapter,
                     logger: mockLogger,
                 }),
@@ -417,7 +418,7 @@ describe('Defauth - Configuration Options and Validation', () => {
             ];
             const defauth = await Defauth.create<UserClaims>(
                 createMockConfig({
-                    audience: customAudiences,
+                    jwtValidationOptions: { audience: customAudiences },
                     storageAdapter: mockStorageAdapter,
                     logger: mockLogger,
                 }),
@@ -430,6 +431,48 @@ describe('Defauth - Configuration Options and Validation', () => {
                 expect.any(Function),
                 expect.objectContaining({
                     audience: customAudiences,
+                }),
+            );
+        });
+    });
+
+    describe('Issuer Configuration', () => {
+        it('should use config.issuer for iss claim validation by default', async () => {
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig({
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    issuer: MOCK_ISSUER,
+                }),
+            );
+        });
+
+        it('should use jwtValidationOptions.issuer for iss claim validation when set', async () => {
+            const tokenIssuer = 'https://auth.example.com/realms/myrealm';
+            const defauth = await Defauth.create<UserClaims>(
+                createMockConfig({
+                    jwtValidationOptions: { issuer: tokenIssuer },
+                    storageAdapter: mockStorageAdapter,
+                    logger: mockLogger,
+                }),
+            );
+
+            await defauth.getUser(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    issuer: tokenIssuer,
                 }),
             );
         });

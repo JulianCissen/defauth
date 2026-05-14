@@ -10,6 +10,7 @@ import type {
 import { TokenType } from '../types/index.js';
 import {
     ConsoleLogger,
+    DEFAULT_JWT_ALGORITHMS,
     defaultUserInfoRefreshCondition,
     getTokenType,
 } from '../utils/index.js';
@@ -131,17 +132,17 @@ export class Defauth<TUser> {
     }
 
     private buildHandlers(config: DefauthConfig<TUser>): void {
-        const logger = config.logger || new ConsoleLogger();
+        const logger = config.logger ?? new ConsoleLogger();
         const userInfoStrategy =
-            config.userInfoStrategy || 'afterUserRetrieval';
+            config.userInfoStrategy ?? 'afterUserRetrieval';
 
         const userInfoManager = new UserInfoManager({
             clientConfig: this.clientConfig!,
             logger,
-            throwOnUserInfoFailure: config.throwOnUserInfoFailure || false,
+            throwOnUserInfoFailure: config.throwOnUserInfoFailure ?? false,
             userInfoStrategy,
             userInfoRefreshCondition:
-                config.userInfoRefreshCondition ||
+                config.userInfoRefreshCondition ??
                 defaultUserInfoRefreshCondition,
             storageAdapter: this.storageAdapter,
         });
@@ -151,13 +152,21 @@ export class Defauth<TUser> {
             config.disableIntrospectionFallthrough,
         );
 
+        // System defaults applied first; user-provided jwtValidationOptions layer on top.
+        // This means partial jwtValidationOptions preserve unset defaults rather than
+        // replacing them entirely.
+        const globalJwtValidationOptions: JwtValidationOptions = {
+            clockTolerance: '1 minute',
+            requiredClaims: ['sub', 'exp'],
+            algorithms: DEFAULT_JWT_ALGORITHMS,
+            audience: config.clientId,
+            issuer: config.issuer,
+            ...config.jwtValidationOptions,
+        };
+
         this.jwtHandler = new JwtHandler({
             clientConfig: this.clientConfig!,
-            audience: config.audience || this.clientId,
-            globalJwtValidationOptions: config.jwtValidationOptions || {
-                requiredClaims: ['sub', 'exp'],
-                clockTolerance: '1 minute',
-            },
+            globalJwtValidationOptions,
             enableIntrospectionFallthrough,
             logger,
             userInfoManager,

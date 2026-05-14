@@ -8,7 +8,6 @@ import type {
     UserClaims,
 } from '../types/index.js';
 import { UserClaimsSchema } from '../types/index.js';
-import { DEFAULT_JWT_ALGORITHMS } from '../utils/constants.js';
 import {
     extractFromIntrospection,
     extractFromJwt,
@@ -18,7 +17,6 @@ import { TokenHandler } from './token-handler.js';
 import type { BaseHandlerConfig, ValidationResult } from './token-handler.js';
 
 export interface JwtHandlerConfig<TUser> extends BaseHandlerConfig<TUser> {
-    audience: string | string[];
     globalJwtValidationOptions: JwtValidationOptions;
     enableIntrospectionFallthrough: boolean;
     logger: Logger;
@@ -113,8 +111,9 @@ export class JwtHandler<TUser> extends TokenHandler<TUser> {
             return await jose.jwtVerify(token, jwks, {
                 clockTolerance: options?.clockTolerance,
                 requiredClaims: options?.requiredClaims,
-                audience: this.config.audience,
-                algorithms: options?.algorithms ?? DEFAULT_JWT_ALGORITHMS,
+                algorithms: options?.algorithms,
+                audience: options?.audience,
+                issuer: options?.issuer,
             });
         } catch (error) {
             if (error instanceof DefauthError) throw error;

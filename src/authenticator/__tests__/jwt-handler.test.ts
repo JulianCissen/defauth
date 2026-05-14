@@ -12,6 +12,7 @@ import { UserInfoManager } from '../user-info-manager.js';
 import {
     MOCK_CLIENT_ID,
     MOCK_INTROSPECTION_ACTIVE,
+    MOCK_ISSUER,
     MOCK_JWT_PAYLOAD,
     MOCK_JWT_TOKEN,
     MOCK_USER_CLAIMS,
@@ -21,6 +22,14 @@ import {
     createMockJwtVerifyResult,
     createMockOpenidClient,
 } from './test-utils.js';
+
+const DEFAULT_GLOBAL_JWT_OPTIONS = {
+    clockTolerance: '1 minute',
+    requiredClaims: ['sub', 'exp'] as string[],
+    algorithms: DEFAULT_JWT_ALGORITHMS,
+    audience: MOCK_CLIENT_ID,
+    issuer: MOCK_ISSUER,
+};
 
 const joseMock = vi.mocked(jose);
 const openidMock = vi.mocked(openid);
@@ -48,11 +57,7 @@ function buildHandler(
 
     return new JwtHandler<UserClaims>({
         clientConfig,
-        audience: MOCK_CLIENT_ID,
-        globalJwtValidationOptions: {
-            requiredClaims: ['sub', 'exp'],
-            clockTolerance: '1 minute',
-        },
+        globalJwtValidationOptions: DEFAULT_GLOBAL_JWT_OPTIONS,
         enableIntrospectionFallthrough: true,
         logger,
         userInfoManager,
@@ -112,20 +117,18 @@ describe('JwtHandler', () => {
             expect(joseMock.jwtVerify).toHaveBeenCalledWith(
                 MOCK_JWT_TOKEN,
                 expect.any(Function),
-                expect.objectContaining({
-                    clockTolerance: '1 minute',
-                    requiredClaims: ['sub', 'exp'],
-                    audience: MOCK_CLIENT_ID,
-                    algorithms: DEFAULT_JWT_ALGORITHMS,
-                }),
+                expect.objectContaining(DEFAULT_GLOBAL_JWT_OPTIONS),
             );
             expect(result.sub).toBe(MOCK_USER_CLAIMS.sub);
         });
 
         it('should pass audience to jwtVerify', async () => {
             const handler = buildHandler({
-                audience: 'https://api.example.com',
                 storageAdapter: mockStorageAdapter,
+                globalJwtValidationOptions: {
+                    ...DEFAULT_GLOBAL_JWT_OPTIONS,
+                    audience: 'https://api.example.com',
+                },
             });
 
             await handler.handle(MOCK_JWT_TOKEN);
@@ -320,6 +323,62 @@ describe('JwtHandler', () => {
         });
     });
 
+    describe('issuer validation', () => {
+        it('should validate the iss claim using config.issuer by default', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    issuer: MOCK_ISSUER,
+                }),
+            );
+        });
+
+        it('should use a custom issuer when set in globalJwtValidationOptions', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+                globalJwtValidationOptions: {
+                    ...DEFAULT_GLOBAL_JWT_OPTIONS,
+                    issuer: 'https://custom-issuer.example.com',
+                },
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    issuer: 'https://custom-issuer.example.com',
+                }),
+            );
+        });
+
+        it('should allow overriding the issuer per-call via JwtValidationOptions', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN, {
+                issuer: 'https://per-call.example.com',
+            });
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    issuer: 'https://per-call.example.com',
+                }),
+            );
+        });
+    });
+
     describe('algorithms option', () => {
         it('should pass DEFAULT_JWT_ALGORITHMS when no algorithms option is set', async () => {
             const handler = buildHandler({
@@ -341,8 +400,7 @@ describe('JwtHandler', () => {
             const handler = buildHandler({
                 storageAdapter: mockStorageAdapter,
                 globalJwtValidationOptions: {
-                    requiredClaims: ['sub', 'exp'],
-                    clockTolerance: '1 minute',
+                    ...DEFAULT_GLOBAL_JWT_OPTIONS,
                     algorithms: ['ES256', 'ES384'],
                 },
             });
