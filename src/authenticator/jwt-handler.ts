@@ -114,6 +114,7 @@ export class JwtHandler<TUser> extends TokenHandler<TUser> {
                 algorithms: options?.algorithms,
                 audience: options?.audience,
                 issuer: options?.issuer,
+                maxTokenAge: options?.maxTokenAge,
             });
         } catch (error) {
             if (error instanceof DefauthError) throw error;

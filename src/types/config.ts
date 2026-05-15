@@ -69,6 +69,12 @@ export interface JwtValidationOptions {
      * (e.g. some Keycloak deployments).
      */
     issuer?: string;
+    /**
+     * Maximum age of the token since it was issued (`iat` claim).
+     * Accepts a string (e.g. `'1 hour'`, `'15 minutes'`) or number of seconds.
+     * Tokens older than this limit are rejected regardless of `exp`.
+     */
+    maxTokenAge?: string | number;
     /** Force token introspection even for valid JWTs */
     forceIntrospection?: boolean;
     /** Custom validator function to apply additional authentication/authorization logic */

@@ -433,6 +433,64 @@ describe('JwtHandler', () => {
         });
     });
 
+    describe('maxTokenAge option', () => {
+        it('should not pass maxTokenAge to jwtVerify when not set', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    maxTokenAge: undefined,
+                }),
+            );
+        });
+
+        it('should pass maxTokenAge from globalJwtValidationOptions', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+                globalJwtValidationOptions: {
+                    ...DEFAULT_GLOBAL_JWT_OPTIONS,
+                    maxTokenAge: '15 minutes',
+                },
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN);
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    maxTokenAge: '15 minutes',
+                }),
+            );
+        });
+
+        it('should allow overriding maxTokenAge per-call', async () => {
+            const handler = buildHandler({
+                storageAdapter: mockStorageAdapter,
+                globalJwtValidationOptions: {
+                    ...DEFAULT_GLOBAL_JWT_OPTIONS,
+                    maxTokenAge: '1 hour',
+                },
+            });
+
+            await handler.handle(MOCK_JWT_TOKEN, { maxTokenAge: 900 });
+
+            expect(joseMock.jwtVerify).toHaveBeenCalledWith(
+                MOCK_JWT_TOKEN,
+                expect.any(Function),
+                expect.objectContaining({
+                    maxTokenAge: 900,
+                }),
+            );
+        });
+    });
+
     describe('beforeUserRetrieval strategy', () => {
         it('should fetch UserInfo before the storage lookup', async () => {
             const handler = buildHandler({
