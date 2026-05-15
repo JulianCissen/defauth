@@ -13,6 +13,8 @@
     "node_modules",
     "dist",
     "examples",
-    "src/**/__tests__"
+    "src/**/__tests__",
+    "vitest.config.ts",
+    "vitest.setup.ts"
   ]
 }
